@@ -14,9 +14,4 @@ export class AppController {
   getTheString(): string {
     return this.appService.getTheString();
   }
-
-  @Get('users')
-  getUsers(): Array<{ id: number; name: string }> {
-    return this.appService.getUsers();
-  }
 }
