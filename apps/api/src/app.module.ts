@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
+import { DepartmentsModule } from './departments/departments.module';
 import * as Joi from 'joi';
 import { join } from 'path';
 import { AppController } from './app.controller';
@@ -23,6 +24,7 @@ import { AuthModule } from './auth/auth.module';
     }),
     PrismaModule,
     UsersModule,
+    DepartmentsModule,
     AuthModule,
   ],
   controllers: [AppController],
