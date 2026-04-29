@@ -1,6 +1,5 @@
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
   moduleFormat    = "cjs"
 }
 
@@ -8,8 +7,309 @@ datasource db {
   provider = "mysql"
 }
 
+enum UserRole {
+  Admin          @map("admin")
+  ItStaff        @map("it_staff")
+  Employee       @map("employee")
+  DepartmentHead @map("department_head")
+}
+
+enum PriorityLevel {
+  Critical @map("critical")
+  High     @map("high")
+  Medium   @map("medium")
+  Low      @map("low")
+}
+
+enum TicketStatus {
+  Open        @map("open")
+  Acknowledged @map("acknowledged")
+  InProgress   @map("in_progress")
+  PendingUser  @map("pending_user")
+  Resolved     @map("resolved")
+  Closed       @map("closed")
+}
+
+enum KnownIssueStatus {
+  Active   @map("active")
+  Resolved @map("resolved")
+}
+
+enum SlaType {
+  Acknowledgement @map("acknowledgement")
+  Resolution      @map("resolution")
+}
+
+enum EscalationNotifyRole {
+  Admin          @map("admin")
+  DepartmentHead @map("department_head")
+}
+
+enum NotificationType {
+  TicketCreated      @map("ticket_created")
+  StatusChanged      @map("status_changed")
+  Escalation         @map("escalation")
+  KnownIssueResolved @map("known_issue_resolved")
+  Assignment         @map("assignment")
+  SlaBreach          @map("sla_breach")
+}
+
+enum NotificationChannel {
+  Email @map("email")
+  InApp @map("in_app")
+}
+
+enum ReportType {
+  WeeklyItDigest    @map("weekly_it_digest")
+  MonthlyPdf        @map("monthly_pdf")
+  DeptWeeklySummary @map("dept_weekly_summary")
+  DailyStaffBriefing @map("daily_staff_briefing")
+}
+
+enum ReportStatus {
+  Success @map("success")
+  Failed  @map("failed")
+}
+
 model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String?
+  id           String   @id @default(uuid()) @db.Char(36)
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  firstName    String?  @map("first_name") @db.VarChar(50)
+  lastName     String?  @map("last_name") @db.VarChar(50)
+  role         UserRole
+  departmentId String?  @map("department_id") @db.Char(36)
+  department   Department? @relation("DepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  deletedAt    DateTime? @map("deleted_at") @db.DateTime(0)
+
+  headedDepartment    Department?          @relation("DepartmentHead")
+  assignedAssets      Asset[]              @relation("AssetAssignee")
+  filedTickets        Ticket[]             @relation("TicketFiledBy")
+  assignedTickets     Ticket[]             @relation("TicketAssignedTo")
+  authoredComments    TicketComment[]
+  uploadedAttachments TicketAttachment[]
+  statusChanges       TicketStatusHistory[]
+  createdKnownIssues  KnownIssue[]         @relation("KnownIssueCreator")
+  notifications       Notification[]
+  scheduledReports    ScheduledReport[]
+  escalationsNotified EscalationEvent[]     @relation("EscalationNotifiedUser")
+
+  @@map("users")
+}
+
+model Department {
+  id         String  @id @default(uuid()) @db.Char(36)
+  name       String  @db.VarChar(100)
+  headUserId String? @unique @map("head_user_id") @db.Char(36)
+  headUser   User?   @relation("DepartmentHead", fields: [headUserId], references: [id], onDelete: SetNull)
+
+  members User[] @relation("DepartmentMembers")
+  tickets Ticket[]
+
+  @@map("departments")
+}
+
+model Asset {
+  id              String   @id @default(uuid()) @db.Char(36)
+  assignedToUserId String?  @map("assigned_to_user_id") @db.Char(36)
+  assignedToUser  User?    @relation("AssetAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  assetTag        String?  @unique @map("asset_tag") @db.VarChar(100)
+  deviceType      String   @map("device_type") @db.VarChar(100)
+  brand           String?  @db.VarChar(100)
+  model           String?  @db.VarChar(100)
+  serialNumber    String?  @unique @map("serial_number") @db.VarChar(100)
+  purchasedAt     DateTime? @map("purchased_at") @db.Date
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now()) @map("created_at") @db.DateTime(0)
+
+  tickets Ticket[]
+
+  @@map("assets")
+}
+
+model TicketCategory {
+  id          String   @id @default(uuid()) @db.Char(36)
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  isActive    Boolean  @default(true) @map("is_active")
+  deletedAt   DateTime? @map("deleted_at") @db.DateTime(0)
+
+  tickets Ticket[]
+
+  @@map("ticket_categories")
+}
+
+model SlaPolicy {
+  id                    String       @id @default(uuid()) @db.Char(36)
+  priorityLevel         PriorityLevel @unique @map("priority_level")
+  acknowledgementMinutes Int          @map("acknowledgement_minutes")
+  resolutionMinutes     Int           @map("resolution_minutes")
+
+  @@map("sla_policies")
+}
+
+model Ticket {
+  id                    String        @id @default(uuid()) @db.Char(36)
+  title                 String        @db.VarChar(255)
+  description           String        @db.Text
+  categoryId            String        @map("category_id") @db.Char(36)
+  category              TicketCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  assetId               String?       @map("asset_id") @db.Char(36)
+  asset                 Asset?        @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  filedByUserId         String        @map("filed_by_user_id") @db.Char(36)
+  filedByUser           User          @relation("TicketFiledBy", fields: [filedByUserId], references: [id], onDelete: Restrict)
+  departmentId          String        @map("department_id") @db.Char(36)
+  department            Department    @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  assignedToUserId      String?       @map("assigned_to_user_id") @db.Char(36)
+  assignedToUser        User?         @relation("TicketAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  priority              PriorityLevel
+  status                TicketStatus
+  knownIssueId          String?       @map("known_issue_id") @db.Char(36)
+  knownIssue            KnownIssue?   @relation(fields: [knownIssueId], references: [id], onDelete: SetNull)
+  slaAckDeadline        DateTime      @map("sla_ack_deadline") @db.DateTime(0)
+  slaResolutionDeadline DateTime      @map("sla_resolution_deadline") @db.DateTime(0)
+  slaPausedAt           DateTime?     @map("sla_paused_at") @db.DateTime(0)
+  totalPausedMinutes    Int           @default(0) @map("total_paused_minutes")
+  acknowledgedAt        DateTime?     @map("acknowledged_at") @db.DateTime(0)
+  resolvedAt            DateTime?     @map("resolved_at") @db.DateTime(0)
+  closedAt              DateTime?     @map("closed_at") @db.DateTime(0)
+  slaAckBreached        Boolean       @default(false) @map("sla_ack_breached")
+  slaResolutionBreached Boolean       @default(false) @map("sla_resolution_breached")
+  createdAt             DateTime      @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt             DateTime      @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+
+  comments      TicketComment[]
+  attachments   TicketAttachment[]
+  statusHistory TicketStatusHistory[]
+  notifications Notification[]
+  escalations   EscalationEvent[]
+
+  @@map("tickets")
+}
+
+model TicketComment {
+  id           String   @id @default(uuid()) @db.Char(36)
+  ticketId     String   @map("ticket_id") @db.Char(36)
+  ticket       Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorUserId String   @map("author_user_id") @db.Char(36)
+  authorUser   User     @relation(fields: [authorUserId], references: [id], onDelete: Restrict)
+  body         String   @db.Text
+  isInternal   Boolean  @default(false) @map("is_internal")
+  createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(0)
+
+  attachments TicketAttachment[]
+
+  @@map("ticket_comments")
+}
+
+model TicketAttachment {
+  id               String         @id @default(uuid()) @db.Char(36)
+  ticketId         String         @map("ticket_id") @db.Char(36)
+  ticket           Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  commentId        String?        @map("comment_id") @db.Char(36)
+  comment          TicketComment? @relation(fields: [commentId], references: [id], onDelete: SetNull)
+  uploadedByUserId String         @map("uploaded_by_user_id") @db.Char(36)
+  uploadedByUser   User           @relation(fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  fileUrlOrPath    String         @map("file_url_or_path") @db.VarChar(500)
+  fileName         String         @map("file_name") @db.VarChar(255)
+  fileType         String         @map("file_type") @db.VarChar(100)
+  fileSizeBytes    Int?           @map("file_size_bytes")
+  createdAt        DateTime       @default(now()) @map("created_at") @db.DateTime(0)
+
+  @@map("ticket_attachments")
+}
+
+model TicketStatusHistory {
+  id             String       @id @default(uuid()) @db.Char(36)
+  ticketId       String       @map("ticket_id") @db.Char(36)
+  ticket         Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  changedByUserId String      @map("changed_by_user_id") @db.Char(36)
+  changedByUser  User         @relation(fields: [changedByUserId], references: [id], onDelete: Restrict)
+  fromStatus     TicketStatus? @map("from_status")
+  toStatus       TicketStatus  @map("to_status")
+  changedAt      DateTime     @default(now()) @map("changed_at") @db.DateTime(0)
+
+  @@map("ticket_status_history")
+}
+
+model KnownIssue {
+  id              String           @id @default(uuid()) @db.Char(36)
+  title           String           @db.VarChar(255)
+  description     String           @db.Text
+  createdByUserId String           @map("created_by_user_id") @db.Char(36)
+  createdByUser   User             @relation("KnownIssueCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  status          KnownIssueStatus
+  resolvedAt      DateTime?        @map("resolved_at") @db.DateTime(0)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.DateTime(0)
+  deletedAt       DateTime?        @map("deleted_at") @db.DateTime(0)
+
+  tickets Ticket[]
+
+  @@map("known_issues")
+}
+
+model EscalationRule {
+  id                  String               @id @default(uuid()) @db.Char(36)
+  priorityLevel       PriorityLevel        @map("priority_level")
+  slaType             SlaType              @map("sla_type")
+  escalationLevel     Int                  @map("escalation_level")
+  triggerAfterMinutes Int                  @map("trigger_after_minutes")
+  notifyRole          EscalationNotifyRole @map("notify_role")
+
+  @@map("escalation_rules")
+}
+
+model EscalationEvent {
+  id             String   @id @default(uuid()) @db.Char(36)
+  ticketId       String   @map("ticket_id") @db.Char(36)
+  ticket         Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  escalationLevel Int     @map("escalation_level")
+  notifiedUserId String   @map("notified_user_id") @db.Char(36)
+  notifiedUser   User     @relation("EscalationNotifiedUser", fields: [notifiedUserId], references: [id], onDelete: Restrict)
+  triggeredAt    DateTime @default(now()) @map("triggered_at") @db.DateTime(0)
+
+  @@map("escalation_events")
+}
+
+model Notification {
+  id              String             @id @default(uuid()) @db.Char(36)
+  recipientUserId String             @map("recipient_user_id") @db.Char(36)
+  recipientUser   User               @relation(fields: [recipientUserId], references: [id], onDelete: Restrict)
+  ticketId        String?            @map("ticket_id") @db.Char(36)
+  ticket          Ticket?            @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  type            NotificationType
+  channel         NotificationChannel
+  subject         String?            @db.VarChar(255)
+  body            String             @db.Text
+  sentAt          DateTime?          @map("sent_at") @db.DateTime(0)
+  createdAt       DateTime           @default(now()) @map("created_at") @db.DateTime(0)
+
+  @@map("notifications")
+}
+
+model ScheduledReport {
+  id              String      @id @default(uuid()) @db.Char(36)
+  reportType      ReportType  @map("report_type")
+  recipientUserId String      @map("recipient_user_id") @db.Char(36)
+  recipientUser   User        @relation(fields: [recipientUserId], references: [id], onDelete: Restrict)
+  scheduleCron    String      @map("schedule_cron") @db.VarChar(100)
+  lastSentAt      DateTime?   @map("last_sent_at") @db.DateTime(0)
+
+  reportLogs ReportLog[]
+
+  @@map("scheduled_reports")
+}
+
+model ReportLog {
+  id                String      @id @default(uuid()) @db.Char(36)
+  scheduledReportId String      @map("scheduled_report_id") @db.Char(36)
+  scheduledReport   ScheduledReport @relation(fields: [scheduledReportId], references: [id], onDelete: Cascade)
+  generatedAt       DateTime    @default(now()) @map("generated_at") @db.DateTime(0)
+  status            ReportStatus
+  filePath          String?     @map("file_path") @db.VarChar(500)
+  errorMessage      String?     @map("error_message") @db.Text
+
+  @@map("report_logs")
 }
