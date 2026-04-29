@@ -1,18 +1,10 @@
-/*
-  Warnings:
-
-  - You are about to drop the `user` table. If the table is not empty, all the data it contains will be lost.
-
-*/
--- DropTable
-DROP TABLE `user`;
-
 -- CreateTable
 CREATE TABLE `users` (
     `id` CHAR(36) NOT NULL,
     `email` VARCHAR(255) NOT NULL,
     `password_hash` VARCHAR(255) NOT NULL,
-    `full_name` VARCHAR(100) NOT NULL,
+    `first_name` VARCHAR(50) NULL,
+    `last_name` VARCHAR(50) NULL,
     `role` ENUM('admin', 'it_staff', 'employee', 'department_head') NOT NULL,
     `department_id` CHAR(36) NULL,
     `is_active` BOOLEAN NOT NULL DEFAULT true,
