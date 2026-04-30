@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,13 +19,16 @@ import { getAuthSession } from "@/lib/api/client";
 
 export default function LoginPage() {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const getRoleRedirect = (role?: string) => {
     const roleRedirects: Record<string, string> = {
       Admin: "/admin/dashboard",
+      ItStaff: "/it-staff/dashboard",
       Employee: "/client/dashboard",
+      DepartmentHead: "/department-head/dashboard",
     };
 
     return role ? roleRedirects[role] ?? "/client/dashboard" : "/client/dashboard";
@@ -54,9 +57,20 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       const summary = await login(email, password);
+      
+      // Clear sensitive form data immediately
+      if (formRef.current) {
+        formRef.current.reset();
+      }
+      
       router.push(getRoleRedirect(summary.identity.role));
     } catch {
       setError("Login failed. Check your credentials.");
+      // Clear password field on error for security
+      if (formRef.current) {
+        const passwordInput = formRef.current.querySelector('input[name="password"]') as HTMLInputElement;
+        if (passwordInput) passwordInput.value = "";
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -104,7 +118,13 @@ export default function LoginPage() {
             </CardHeader>
 
             <CardContent className="px-0">
-              <form className="space-y-5" onSubmit={handleSubmit}>
+              <form 
+                ref={formRef}
+                className="space-y-5" 
+                onSubmit={handleSubmit}
+                method="post"
+                autoComplete="off"
+              >
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <div className="relative">

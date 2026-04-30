@@ -3,22 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  ChevronLeft,
-  ChevronRight,
-  LayoutDashboard,
-  LogOut,
-  Building2,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, LayoutDashboard, LogOut, User } from "lucide-react";
 import { logout } from "@/lib/api/auth";
 import { getAuthSession } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
-export default function AdminLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function ItStaffLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const router = useRouter();
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -33,11 +23,15 @@ export default function AdminLayout({
 
     // Normalize role to be resilient to casing/spacing and punctuation differences.
     const role = String(session.identity.role || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-    if (role === "admin") {
+    if (role === "itstaff") {
       setIsAuthorized(true);
     } else {
-      // Redirect non-admin users to client dashboard
-      router.replace("/client/dashboard");
+      const roleRedirects: Record<string, string> = {
+        admin: "/admin/dashboard",
+        employee: "/client/dashboard",
+        departmenthead: "/department-head/dashboard",
+      };
+      router.replace(roleRedirects[role] ?? "/client/dashboard");
     }
   }, [router]);
 
@@ -74,51 +68,34 @@ export default function AdminLayout({
           )}
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-sm font-semibold text-white">
-              A
-            </div>
-            <div
-              className={cn(
-                "overflow-hidden transition-all duration-300",
-                isCollapsed && "w-0",
-              )}
-            >
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-300">
-                Probayo
-              </p>
-              <p className="text-xs text-zinc-500">Admin</p>
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-sm font-semibold text-white">I</div>
+            <div className={cn("overflow-hidden transition-all duration-300", isCollapsed && "w-0") }>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-300">Probayo</p>
+              <p className="text-xs text-zinc-500">It Staff</p>
             </div>
           </div>
 
           <nav className="mt-8 flex flex-1 flex-col gap-2">
             <Link
-              href="/admin/dashboard"
+              href="/it-staff/dashboard"
               className={cn(
                 "group relative flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition",
-                pathname === "/admin/dashboard"
-                  ? "bg-white/10 text-white"
-                  : "text-zinc-400 hover:bg-white/5",
+                pathname === "/it-staff/dashboard" ? "bg-white/10 text-white" : "text-zinc-400 hover:bg-white/5",
               )}
             >
               <LayoutDashboard className="h-5 w-5 shrink-0" />
-              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>
-                Dashboard
-              </span>
+              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>Dashboard</span>
             </Link>
 
             <Link
-              href="/admin/departments"
+              href="/it-staff/profile"
               className={cn(
                 "group relative flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition",
-                pathname === "/admin/departments"
-                  ? "bg-white/10 text-white"
-                  : "text-zinc-400 hover:bg-white/5",
+                pathname === "/it-staff/profile" ? "bg-white/10 text-white" : "text-zinc-400 hover:bg-white/5",
               )}
             >
-              <Building2 className="h-5 w-5 shrink-0" />
-              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>
-                Departments
-              </span>
+              <User className="h-5 w-5 shrink-0" />
+              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>Profile</span>
             </Link>
           </nav>
 
@@ -132,9 +109,7 @@ export default function AdminLayout({
               ) : (
                 <ChevronLeft className="h-5 w-5 shrink-0" />
               )}
-              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>
-                Collapse
-              </span>
+              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>Collapse</span>
             </button>
 
             <button
@@ -142,17 +117,13 @@ export default function AdminLayout({
               className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold text-zinc-400 transition hover:bg-white/5"
             >
               <LogOut className="h-5 w-5 shrink-0" />
-              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>
-                Logout
-              </span>
+              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>Logout</span>
             </button>
           </div>
         </aside>
 
         <main className="flex-1 overflow-hidden">
-          <div className="h-full overflow-y-auto px-2">
-            {children}
-          </div>
+          <div className="h-full overflow-y-auto px-2">{children}</div>
         </main>
       </div>
     </div>

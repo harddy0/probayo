@@ -26,17 +26,35 @@ export default function ClientLayout({
 
   useEffect(() => {
     const session = getAuthSession();
-    // Admin users should access admin dashboard instead
-    if (session?.identity.role === "Admin") {
+    if (!session) {
+      router.replace("/login");
+      return;
+    }
+
+    // Normalize role to be resilient to casing/spacing and punctuation differences.
+    const role = String(session.identity.role || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (role === "admin") {
+      // Admin users should access admin dashboard instead
       router.replace("/admin/dashboard");
+    } else if (role === "itstaff") {
+      // IT Staff should access their own dashboard
+      router.replace("/it-staff/dashboard");
     } else {
       // Employee and other roles can access client area
       setIsAuthorized(true);
     }
   }, [router]);
 
+  // Render a lightweight placeholder while client-side session validation runs
   if (!isAuthorized) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-zinc-100">
+        <div className="animate-pulse rounded-lg bg-white/5 p-6">
+          <div className="h-4 w-40 bg-white/10 mb-3" />
+          <div className="h-3 w-32 bg-white/8" />
+        </div>
+      </div>
+    );
   }
 
   const handleLogout = () => {
