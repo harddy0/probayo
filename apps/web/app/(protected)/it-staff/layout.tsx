@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, LayoutDashboard, LogOut, User } from "lucide-react";
+import { ChevronLeft, ChevronRight, HardDrive, LayoutDashboard, LogOut, User } from "lucide-react";
 import { logout } from "@/lib/api/auth";
 import { getAuthSession } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
@@ -59,14 +59,14 @@ export default function ItStaffLayout({ children }: Readonly<{ children: React.R
       <div className="absolute right-10 top-24 h-72 w-72 rounded-full bg-white/5 blur-[120px]" />
       <div className="absolute bottom-16 left-1/3 h-48 w-48 rounded-full bg-white/5 blur-[110px]" />
 
-      <div className="relative z-10 flex w-full gap-6 px-4 py-6 sm:px-6">
-        <aside
-          className={cn(
-            "sticky top-6 flex h-[calc(100vh-3rem)] shrink-0 flex-col rounded-[28px] border border-white/10 bg-white/5 p-4 shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur",
-            "transition-[width] duration-300",
-            isCollapsed ? "w-20" : "w-64",
-          )}
-        >
+      <aside
+        className={cn(
+          "fixed left-0 top-0 z-20 flex h-screen shrink-0 flex-col rounded-0 border-r border-white/10 bg-white/5 px-4 py-6 shadow-[30px_0_80px_rgba(0,0,0,0.45)] backdrop-blur",
+          "transition-[width] duration-300",
+          isCollapsed ? "w-20" : "w-64",
+        )}
+      >
+        <div className="flex flex-col h-full">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-sm font-semibold text-white">I</div>
             <div className={cn("overflow-hidden transition-all duration-300", isCollapsed && "w-0") }>
@@ -97,6 +97,17 @@ export default function ItStaffLayout({ children }: Readonly<{ children: React.R
               <User className="h-5 w-5 shrink-0" />
               <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>Profile</span>
             </Link>
+
+            <Link
+              href="/it-staff/assets"
+              className={cn(
+                "group relative flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition",
+                pathname === "/it-staff/assets" ? "bg-white/10 text-white" : "text-zinc-400 hover:bg-white/5",
+              )}
+            >
+              <HardDrive className="h-5 w-5 shrink-0" />
+              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>Assets</span>
+            </Link>
           </nav>
 
           <div className="space-y-2 border-t border-white/10 pt-4">
@@ -120,12 +131,19 @@ export default function ItStaffLayout({ children }: Readonly<{ children: React.R
               <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>Logout</span>
             </button>
           </div>
-        </aside>
+        </div>
+      </aside>
 
-        <main className="flex-1 overflow-hidden">
-          <div className="h-full overflow-y-auto px-2">{children}</div>
-        </main>
-      </div>
+      <main className={cn(
+        "relative z-10 h-screen overflow-hidden transition-[margin-left] duration-300",
+        isCollapsed ? "ml-20" : "ml-64",
+      )}>
+        <div className="h-full overflow-y-auto">
+          <div className="px-6 py-6 sm:px-8">
+            {children}
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
