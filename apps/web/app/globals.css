@@ -25,6 +25,23 @@ body {
   background: var(--background);
 }
 
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: #f4f4f5;
+  box-shadow: 0 0 0px 1000px rgba(24, 24, 27, 0.95) inset;
+  caret-color: #f4f4f5;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
 * {
   box-sizing: border-box;
   padding: 0;
