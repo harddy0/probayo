@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,15 +14,61 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowRight, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
+import { login } from "@/lib/api/auth";
+import { getAuthSession } from "@/lib/api/client";
 
 export default function LoginPage() {
-  return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-zinc-950 px-6 py-10 text-zinc-50">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.16),_transparent_42%),radial-gradient(circle_at_bottom_right,_rgba(255,255,255,0.08),_transparent_28%),linear-gradient(135deg,_rgba(24,24,27,0.98),_rgba(9,9,11,1))]" />
-      <div className="absolute left-10 top-10 h-32 w-32 rounded-full bg-white/5 blur-3xl" />
-      <div className="absolute right-16 top-24 h-40 w-40 rounded-full bg-white/5 blur-3xl" />
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-      <Card className="relative w-full max-w-5xl overflow-hidden border-white/10 bg-white/5 shadow-[0_30px_120px_rgba(0,0,0,0.55)]">
+  const getRoleRedirect = (role?: string) => {
+    const roleRedirects: Record<string, string> = {
+      Admin: "/client",
+      Employee: "/client",
+    };
+
+    return role ? roleRedirects[role] ?? "/client" : "/client";
+  };
+
+  useEffect(() => {
+    const session = getAuthSession();
+    if (session) {
+      router.replace(getRoleRedirect(session.identity.role));
+    }
+  }, [router]);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+
+    const formData = new FormData(event.currentTarget);
+    const email = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+
+    if (!email || !password) {
+      setError("Email and password are required.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const summary = await login(email, password);
+      router.push(getRoleRedirect(summary.identity.role));
+    } catch {
+      setError("Login failed. Check your credentials.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-zinc-950 px-4 py-8 text-zinc-50 sm:px-6 sm:py-10">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.16),_transparent_42%),radial-gradient(circle_at_bottom_right,_rgba(255,255,255,0.08),_transparent_28%),linear-gradient(135deg,_rgba(24,24,27,0.98),_rgba(9,9,11,1))]" />
+      <div className="absolute left-8 top-10 h-32 w-32 rounded-full bg-white/5 blur-3xl" />
+      <div className="absolute right-14 top-24 h-40 w-40 rounded-full bg-white/5 blur-3xl" />
+
+      <Card className="relative w-full max-w-5xl overflow-hidden border-white/10 bg-white/5 shadow-[0_30px_120px_rgba(0,0,0,0.55)] backdrop-blur">
         <div className="grid md:grid-cols-[1.05fr_0.95fr]">
           <div className="hidden flex-col justify-between border-r border-white/10 p-8 md:flex lg:p-10">
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.35em] text-zinc-400">
@@ -54,7 +104,7 @@ export default function LoginPage() {
             </CardHeader>
 
             <CardContent className="px-0">
-              <form className="space-y-5">
+              <form className="space-y-5" onSubmit={handleSubmit}>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <div className="relative">
@@ -85,8 +135,12 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full gap-2">
-                  Login
+                {error ? (
+                  <p className="text-sm text-rose-400">{error}</p>
+                ) : null}
+
+                <Button type="submit" className="w-full gap-2" disabled={isSubmitting}>
+                  {isSubmitting ? "Signing in" : "Login"}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </form>
