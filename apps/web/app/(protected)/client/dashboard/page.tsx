@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight, Sparkles, UserRound } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function ClientLandingPage() {
+export default function DashboardPage() {
   return (
     <section className="space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

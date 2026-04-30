@@ -24,11 +24,11 @@ export default function LoginPage() {
 
   const getRoleRedirect = (role?: string) => {
     const roleRedirects: Record<string, string> = {
-      Admin: "/client",
-      Employee: "/client",
+      Admin: "/admin/dashboard",
+      Employee: "/client/dashboard",
     };
 
-    return role ? roleRedirects[role] ?? "/client" : "/client";
+    return role ? roleRedirects[role] ?? "/client/dashboard" : "/client/dashboard";
   };
 
   useEffect(() => {
