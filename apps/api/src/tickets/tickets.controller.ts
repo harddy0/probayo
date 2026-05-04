@@ -144,9 +144,10 @@ export class TicketsController {
   assign(
     @Param('id') id: string,
     @Param('userId') userId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     @Request() req: { user: { id: string } },
   ) {
-    return this.ticketsService.assignTicket(id, userId, req.user.id);
+    return this.ticketsService.assignTicket(id, userId);
   }
 
   @Post(':id/unassign')
@@ -155,8 +156,9 @@ export class TicketsController {
   @ApiOperation({ summary: 'Unassign ticket (Admin/IT only)' })
   @ApiParam({ name: 'id', description: 'Ticket UUID' })
   @ApiResponse({ status: 200, description: 'Ticket unassigned successfully' })
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   unassign(@Param('id') id: string, @Request() req: { user: { id: string } }) {
-    return this.ticketsService.unassignTicket(id, req.user.id);
+    return this.ticketsService.unassignTicket(id);
   }
 
   // ==================== COMMENT ENDPOINTS ====================

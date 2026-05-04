@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import type { File as MulterFile } from 'multer';
 
 @Injectable()
 export class LocalStorageService {
@@ -22,9 +23,9 @@ export class LocalStorageService {
     }
   }
 
-  async save(file: Express.Multer.File, ticketId: string): Promise<string> {
+  async save(file: MulterFile, ticketId: string): Promise<string> {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    const filename = `${uuidv4()}-${file.originalname}`;
+    const filename = `${randomUUID()}-${file.originalname}`;
     const ticketDir = path.join(this.uploadDir, 'tickets', ticketId);
 
     await fs.mkdir(ticketDir, { recursive: true });

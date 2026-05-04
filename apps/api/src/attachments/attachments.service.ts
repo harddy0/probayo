@@ -3,11 +3,23 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
+  Inject,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Inject } from '@nestjs/common';
-import { IStorageService } from './storage/storage.interface';
+import type { IStorageService } from './storage/storage.interface';
 import { UserRole } from '@prisma/client';
+import type { File as MulterFile } from 'multer';
+
+type AttachmentUser = {
+  id: string;
+  role: UserRole;
+  departmentId: string | null;
+};
+
+type AttachmentTicket = {
+  departmentId: string;
+  filedByUserId: string;
+};
 
 @Injectable()
 export class AttachmentsService {
@@ -21,7 +33,7 @@ export class AttachmentsService {
   async uploadAttachment(
     ticketId: string,
     userId: string,
-    file: Express.Multer.File,
+    file: MulterFile,
     commentId?: string,
   ) {
     // Verify ticket exists and user has access
@@ -41,7 +53,10 @@ export class AttachmentsService {
       throw new NotFoundException('User not found');
     }
 
-    const canUpload = this.canUploadToTicket(user, ticket);
+    const canUpload = this.canUploadToTicket(
+      user as AttachmentUser,
+      ticket as AttachmentTicket,
+    );
     if (!canUpload) {
       throw new ForbiddenException(
         'You do not have permission to upload attachments to this ticket',
@@ -115,7 +130,10 @@ export class AttachmentsService {
       where: { id: userId },
     });
 
-    const canView = this.canViewTicket(user, ticket);
+    const canView = this.canViewTicket(
+      user as AttachmentUser,
+      ticket as AttachmentTicket,
+    );
     if (!canView) {
       throw new ForbiddenException(
         'You do not have permission to view attachments for this ticket',
@@ -155,7 +173,10 @@ export class AttachmentsService {
       where: { id: userId },
     });
 
-    const canView = this.canViewTicket(user, comment.ticket);
+    const canView = this.canViewTicket(
+      user as AttachmentUser,
+      comment.ticket as AttachmentTicket,
+    );
     if (!canView) {
       throw new ForbiddenException(
         'You do not have permission to view attachments for this comment',
@@ -195,7 +216,10 @@ export class AttachmentsService {
       where: { id: userId },
     });
 
-    const canView = this.canViewTicket(user, attachment.ticket);
+    const canView = this.canViewTicket(
+      user as AttachmentUser,
+      attachment.ticket as AttachmentTicket,
+    );
     if (!canView) {
       throw new ForbiddenException(
         'You do not have permission to download this attachment',
@@ -227,10 +251,14 @@ export class AttachmentsService {
       where: { id: userId },
     });
 
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
     const canDelete =
       attachment.uploadedByUserId === userId ||
-      user.role === UserRole.admin ||
-      user.role === UserRole.it_staff;
+      user.role === UserRole.Admin ||
+      user.role === UserRole.ItStaff;
 
     if (!canDelete) {
       throw new ForbiddenException(
@@ -253,36 +281,36 @@ export class AttachmentsService {
 
   // ==================== HELPER METHODS ====================
 
-  private canUploadToTicket(user: any, ticket: any): boolean {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  private canUploadToTicket(
+    user: AttachmentUser,
+    ticket: AttachmentTicket,
+  ): boolean {
     switch (user.role) {
-      case UserRole.admin:
+      case UserRole.Admin:
         return true;
-      case UserRole.it_staff:
+      case UserRole.ItStaff:
         return true;
-      case UserRole.department_head:
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      case UserRole.DepartmentHead:
         return user.departmentId === ticket.departmentId;
-      case UserRole.employee:
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      case UserRole.Employee:
         return user.id === ticket.filedByUserId;
       default:
         return false;
     }
   }
 
-  private canViewTicket(user: any, ticket: any): boolean {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  private canViewTicket(
+    user: AttachmentUser,
+    ticket: AttachmentTicket,
+  ): boolean {
     switch (user.role) {
-      case UserRole.admin:
+      case UserRole.Admin:
         return true;
-      case UserRole.it_staff:
+      case UserRole.ItStaff:
         return true;
-      case UserRole.department_head:
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      case UserRole.DepartmentHead:
         return user.departmentId === ticket.departmentId;
-      case UserRole.employee:
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      case UserRole.Employee:
         return user.id === ticket.filedByUserId;
       default:
         return false;

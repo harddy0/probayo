@@ -11,6 +11,7 @@ import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { CreateTicketCommentDto } from './dto/create-comment.dto';
 import { UpdateTicketCommentDto } from './dto/update-comment.dto';
 import { PriorityLevel, Prisma, TicketStatus, UserRole } from '@prisma/client';
+import { CommentsService } from '../comments/comments.service';
 
 type TicketActor = {
   id: string;
@@ -489,12 +490,7 @@ export class TicketsService {
     userId: string,
     createCommentDto: CreateTicketCommentDto,
   ) {
-    // Delegate to CommentsService
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const { CommentsService } = await import('../../comments/comments.service');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
     const commentsService = new CommentsService(this.prisma);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     return commentsService.create(userId, {
       ticketId,
       body: createCommentDto.body,
@@ -503,12 +499,7 @@ export class TicketsService {
   }
 
   async getComments(ticketId: string, userId: string) {
-    // Delegate to CommentsService
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const { CommentsService } = await import('../../comments/comments.service');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
     const commentsService = new CommentsService(this.prisma);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     return commentsService.findAll(ticketId, userId);
   }
 
@@ -517,20 +508,12 @@ export class TicketsService {
     userId: string,
     updateCommentDto: UpdateTicketCommentDto,
   ) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const { CommentsService } = await import('../../comments/comments.service');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
     const commentsService = new CommentsService(this.prisma);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     return commentsService.update(commentId, userId, updateCommentDto);
   }
 
   async deleteComment(commentId: string, userId: string) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const { CommentsService } = await import('../../comments/comments.service');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
     const commentsService = new CommentsService(this.prisma);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     return commentsService.remove(commentId, userId);
   }
 

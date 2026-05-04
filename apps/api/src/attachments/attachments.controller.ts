@@ -11,7 +11,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Response } from 'express';
+import type { Response } from 'express';
 import {
   ApiBearerAuth,
   ApiTags,
@@ -24,6 +24,7 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AttachmentsService } from './attachments.service';
 import { AttachmentResponseDto } from './dto/attachment-response.dto';
+import type { File as MulterFile } from 'multer';
 
 @ApiTags('attachments')
 @ApiBearerAuth()
@@ -56,7 +57,7 @@ export class AttachmentsController {
   })
   async uploadToTicket(
     @Param('ticketId') ticketId: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: MulterFile,
     @Request() req: { user: { id: string } },
   ) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
@@ -91,7 +92,7 @@ export class AttachmentsController {
   })
   async uploadToComment(
     @Param('commentId') commentId: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: MulterFile,
     @Request() req: { user: { id: string } },
   ) {
     // First get the ticket ID from the comment
