@@ -11,6 +11,8 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { SlaModule } from './sla/sla.module';
+import { CommentsModule } from './comments/comments.module';
+import { AttachmentsModule } from './attachments/attachments.module';
 
 @Module({
   imports: [
@@ -32,6 +34,8 @@ import { SlaModule } from './sla/sla.module';
     AuthModule,
     TicketsModule,
     SlaModule,
+    CommentsModule,
+    AttachmentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -26,7 +26,7 @@ import { UpdateSlaPolicyDto } from './dto/update-sla-policy.dto';
 import { SlaPolicyResponseDto } from './dto/sla-policy-response.dto';
 
 @ApiTags('SLA Policies')
-@ApiBearerAuth('bearer') // ← Changed to match main.ts
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('sla-policies')
 export class SlaController {
