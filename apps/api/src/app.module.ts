@@ -10,6 +10,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { TicketsModule } from './tickets/tickets.module';
+import { SlaModule } from './sla/sla.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { TicketsModule } from './tickets/tickets.module';
     AssetsModule,
     AuthModule,
     TicketsModule,
+    SlaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

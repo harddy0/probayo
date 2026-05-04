@@ -1,11 +1,15 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
+import { PrismaModule } from '../prisma/prisma.module';
+import { SlaModule } from '../sla/sla.module';
 import { TicketsService } from './tickets.service';
 import { TicketsController } from './tickets.controller';
-import { PrismaModule } from '../prisma/prisma.module';
-import { AuthModule } from '../auth/auth.module';
+import { CategoriesService } from './categories/categories.service';
+import { CategoriesController } from './categories/categories.controller';
+
 @Module({
-  imports: [PrismaModule, AuthModule],
-  controllers: [TicketsController],
-  providers: [TicketsService],
+  imports: [PrismaModule, forwardRef(() => SlaModule)],
+  controllers: [TicketsController, CategoriesController],
+  providers: [TicketsService, CategoriesService],
+  exports: [TicketsService],
 })
 export class TicketsModule {}

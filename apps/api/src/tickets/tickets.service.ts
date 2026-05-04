@@ -1,26 +1,578 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { SlaService } from '../sla/sla.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
+import { PriorityLevel, Prisma, TicketStatus, UserRole } from '@prisma/client';
+
+type TicketActor = {
+  id: string;
+  role: UserRole;
+  departmentId?: string | null;
+};
 
 @Injectable()
 export class TicketsService {
-  create(createTicketDto: CreateTicketDto) {
-    return 'This action adds a new ticket';
+  constructor(
+    private prisma: PrismaService,
+    private slaService: SlaService,
+  ) {}
+
+  // ==================== CREATE TICKET ====================
+  async create(userId: string, createTicketDto: CreateTicketDto) {
+    // 1. Get user details
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { department: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!user.departmentId) {
+      throw new BadRequestException(
+        'User must belong to a department to file a ticket',
+      );
+    }
+
+    // 2. Validate category exists and is active
+    const category = await this.prisma.ticketCategory.findFirst({
+      where: {
+        id: createTicketDto.categoryId,
+        isActive: true,
+        deletedAt: null,
+      },
+    });
+
+    if (!category) {
+      throw new BadRequestException('Invalid or inactive ticket category');
+    }
+
+    // 3. Validate asset if provided
+    if (createTicketDto.assetId) {
+      const asset = await this.prisma.asset.findUnique({
+        where: { id: createTicketDto.assetId },
+      });
+      if (!asset) {
+        throw new BadRequestException('Asset not found');
+      }
+    }
+
+    // 4. Set priority (default to medium if not provided)
+    const priority = createTicketDto.priority || PriorityLevel.Medium;
+
+    // 5. Calculate SLA deadlines
+    const deadlines = await this.slaService.calculateDeadlines(priority);
+
+    // 6. Create ticket
+    const ticket = await this.prisma.ticket.create({
+      data: {
+        title: createTicketDto.title,
+        description: createTicketDto.description,
+        categoryId: createTicketDto.categoryId,
+        assetId: createTicketDto.assetId,
+        priority: priority,
+        status: TicketStatus.Open,
+        filedByUserId: userId,
+        departmentId: user.departmentId,
+        slaAckDeadline: deadlines.ack,
+        slaResolutionDeadline: deadlines.resolution,
+      },
+      include: {
+        filedByUser: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+        assignedToUser: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+        department: true,
+        category: true,
+        asset: true,
+      },
+    });
+
+    // 7. Record status history
+    await this.recordStatusHistory(ticket.id, null, TicketStatus.Open, userId);
+
+    return ticket;
   }
 
-  findAll() {
-    return `This action returns all tickets`;
+  // ==================== FIND ALL TICKETS (Role-based) ====================
+  async findAll(userId: string, filters?: Prisma.TicketWhereInput) {
+    const where: Prisma.TicketWhereInput = {};
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Role-based filtering
+    if (user.role === UserRole.Employee) {
+      where.filedByUserId = user.id;
+    } else if (user.role === UserRole.DepartmentHead) {
+      where.departmentId = user.departmentId ?? undefined;
+    }
+    // Admin and IT Staff see all tickets
+
+    // Apply filters
+    if (filters?.status) {
+      where.status = filters.status;
+    }
+    if (filters?.priority) {
+      where.priority = filters.priority;
+    }
+    if (filters?.assignedToUserId) {
+      where.assignedToUserId = filters.assignedToUserId;
+    }
+    if (
+      filters?.departmentId &&
+      (user.role === UserRole.Admin || user.role === UserRole.ItStaff)
+    ) {
+      where.departmentId = filters.departmentId;
+    }
+    if (filters?.categoryId) {
+      where.categoryId = filters.categoryId;
+    }
+
+    return this.prisma.ticket.findMany({
+      where,
+      include: {
+        filedByUser: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+        assignedToUser: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+        department: true,
+        category: true,
+        asset: true,
+        _count: {
+          select: {
+            comments: true,
+            attachments: true,
+          },
+        },
+      },
+      orderBy: [
+        { priority: 'desc' }, // critical first
+        { slaAckDeadline: 'asc' }, // soonest deadlines first
+      ],
+    });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} ticket`;
+  // ==================== FIND ONE TICKET ====================
+  async findOne(id: string, userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id },
+      include: {
+        filedByUser: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+        assignedToUser: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+        department: true,
+        category: true,
+        asset: true,
+        comments: {
+          include: {
+            authorUser: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+            attachments: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+        attachments: {
+          where: { commentId: null }, // Ticket-level attachments only
+        },
+        statusHistory: {
+          include: {
+            changedByUser: {
+              select: { id: true, firstName: true, lastName: true },
+            },
+          },
+          orderBy: { changedAt: 'desc' },
+        },
+      },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException(`Ticket ${id} not found`);
+    }
+
+    // Check permissions
+    const canView = this.canViewTicket(user, ticket);
+    if (!canView) {
+      throw new ForbiddenException(
+        'You do not have permission to view this ticket',
+      );
+    }
+
+    return ticket;
   }
 
-  update(id: number, updateTicketDto: UpdateTicketDto) {
-    return `This action updates a #${id} ticket`;
+  // ==================== UPDATE TICKET ====================
+  async update(id: string, userId: string, updateTicketDto: UpdateTicketDto) {
+    // 1. Get existing ticket
+    const existingTicket = await this.prisma.ticket.findUnique({
+      where: { id },
+      include: {
+        filedByUser: true,
+      },
+    });
+
+    if (!existingTicket) {
+      throw new NotFoundException(`Ticket ${id} not found`);
+    }
+
+    // 2. Check permissions
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const canUpdate = this.canUpdateTicket(user, existingTicket);
+    if (!canUpdate) {
+      throw new ForbiddenException(
+        'You do not have permission to update this ticket',
+      );
+    }
+
+    // 3. Prepare update data
+    const { departmentId: requestedDepartmentId, ...updateTicketData } =
+      updateTicketDto;
+    const updateData: Prisma.TicketUncheckedUpdateInput = {
+      ...updateTicketData,
+    };
+
+    // 4. Handle status change
+    let statusChanged = false;
+    const oldStatus = existingTicket.status;
+    const newStatus = updateTicketDto.status;
+
+    if (newStatus && newStatus !== oldStatus) {
+      statusChanged = true;
+
+      // Validate status transition
+      this.validateStatusTransition(oldStatus, newStatus, user.role);
+
+      // Handle SLA pause/resume for pending_user
+      if (
+        newStatus === TicketStatus.PendingUser &&
+        !existingTicket.slaPausedAt
+      ) {
+        updateData.slaPausedAt = new Date();
+      } else if (
+        oldStatus === TicketStatus.PendingUser &&
+        newStatus !== TicketStatus.PendingUser
+      ) {
+        // Calculate paused duration
+        const pausedMinutes = this.slaService.calculatePausedDuration(
+          existingTicket.slaPausedAt!,
+        );
+        const newTotalPaused =
+          existingTicket.totalPausedMinutes + pausedMinutes;
+
+        updateData.totalPausedMinutes = newTotalPaused;
+        updateData.slaPausedAt = null;
+
+        // Recalculate deadlines
+        const newDeadlines = await this.slaService.calculateDeadlinesWithPause(
+          existingTicket.priority,
+          existingTicket.createdAt,
+          newTotalPaused,
+        );
+        updateData.slaAckDeadline = newDeadlines.ack;
+        updateData.slaResolutionDeadline = newDeadlines.resolution;
+      }
+
+      // Set timestamps based on status
+      if (
+        newStatus === TicketStatus.Acknowledged &&
+        !existingTicket.acknowledgedAt
+      ) {
+        updateData.acknowledgedAt = new Date();
+      }
+      if (newStatus === TicketStatus.Resolved && !existingTicket.resolvedAt) {
+        updateData.resolvedAt = new Date();
+      }
+      if (newStatus === TicketStatus.Closed && !existingTicket.closedAt) {
+        updateData.closedAt = new Date();
+      }
+    }
+
+    // 5. Handle asset validation if being updated
+    if (
+      updateTicketDto.assetId !== undefined &&
+      updateTicketDto.assetId !== null
+    ) {
+      const asset = await this.prisma.asset.findUnique({
+        where: { id: updateTicketDto.assetId },
+      });
+      if (!asset) {
+        throw new BadRequestException('Asset not found');
+      }
+    }
+
+    // 6. Handle category validation if being updated
+    if (updateTicketDto.categoryId) {
+      const category = await this.prisma.ticketCategory.findFirst({
+        where: {
+          id: updateTicketDto.categoryId,
+          isActive: true,
+          deletedAt: null,
+        },
+      });
+      if (!category) {
+        throw new BadRequestException('Invalid or inactive ticket category');
+      }
+    }
+
+    // 7. Handle department change (IT/Admin only)
+    if (requestedDepartmentId && user.role !== UserRole.Employee) {
+      const department = await this.prisma.department.findUnique({
+        where: { id: requestedDepartmentId },
+      });
+      if (!department) {
+        throw new BadRequestException('Department not found');
+      }
+      updateData.departmentId = requestedDepartmentId;
+    } else if (requestedDepartmentId && user.role === UserRole.Employee) {
+      // Employees cannot change department
+    }
+
+    // 8. Update ticket
+    const updatedTicket = await this.prisma.ticket.update({
+      where: { id },
+      data: updateData,
+      include: {
+        filedByUser: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+        assignedToUser: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+        department: true,
+        category: true,
+        asset: true,
+      },
+    });
+
+    // 9. Record status history if changed
+    if (statusChanged) {
+      await this.recordStatusHistory(id, oldStatus, newStatus!, userId);
+    }
+
+    // 10. Check for SLA breaches after update
+    await this.slaService.updateBreachStatus(id);
+
+    return updatedTicket;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} ticket`;
+  // ==================== DELETE TICKET (Soft delete) ====================
+  async remove(id: string, userId: string) {
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException(`Ticket ${id} not found`);
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (
+      !user ||
+      (user.role !== UserRole.Admin && user.role !== UserRole.ItStaff)
+    ) {
+      throw new ForbiddenException(
+        'Only admins and IT staff can delete tickets',
+      );
+    }
+
+    // Soft delete by marking as closed
+    return this.prisma.ticket.update({
+      where: { id },
+      data: {
+        status: TicketStatus.Closed,
+        closedAt: new Date(),
+      },
+    });
+  }
+
+  // ==================== ASSIGN TICKET ====================
+  async assignTicket(id: string, assignedToUserId: string) {
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException(`Ticket ${id} not found`);
+    }
+
+    const assignedToUser = await this.prisma.user.findUnique({
+      where: { id: assignedToUserId },
+    });
+
+    if (!assignedToUser) {
+      throw new NotFoundException(`User ${assignedToUserId} not found`);
+    }
+
+    if (
+      assignedToUser.role !== UserRole.ItStaff &&
+      assignedToUser.role !== UserRole.Admin
+    ) {
+      throw new BadRequestException(
+        'Tickets can only be assigned to IT staff or admins',
+      );
+    }
+
+    const updatedTicket = await this.prisma.ticket.update({
+      where: { id },
+      data: { assignedToUserId },
+      include: {
+        assignedToUser: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+      },
+    });
+
+    return updatedTicket;
+  }
+
+  // ==================== UNASSIGN TICKET ====================
+  async unassignTicket(id: string) {
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException(`Ticket ${id} not found`);
+    }
+
+    return this.prisma.ticket.update({
+      where: { id },
+      data: { assignedToUserId: null },
+    });
+  }
+
+  // ==================== HELPER METHODS ====================
+
+  private async recordStatusHistory(
+    ticketId: string,
+    fromStatus: TicketStatus | null,
+    toStatus: TicketStatus,
+    changedByUserId: string,
+  ) {
+    return this.prisma.ticketStatusHistory.create({
+      data: {
+        ticketId,
+        fromStatus,
+        toStatus,
+        changedByUserId,
+      },
+    });
+  }
+
+  private validateStatusTransition(
+    from: TicketStatus,
+    to: TicketStatus,
+    userRole: UserRole,
+  ) {
+    const allowedTransitions: Record<TicketStatus, TicketStatus[]> = {
+      [TicketStatus.Open]: [TicketStatus.Acknowledged, TicketStatus.Closed],
+      [TicketStatus.Acknowledged]: [
+        TicketStatus.InProgress,
+        TicketStatus.PendingUser,
+        TicketStatus.Resolved,
+        TicketStatus.Closed,
+      ],
+      [TicketStatus.InProgress]: [
+        TicketStatus.PendingUser,
+        TicketStatus.Resolved,
+        TicketStatus.Closed,
+      ],
+      [TicketStatus.PendingUser]: [
+        TicketStatus.InProgress,
+        TicketStatus.Resolved,
+        TicketStatus.Closed,
+      ],
+      [TicketStatus.Resolved]: [TicketStatus.Closed, TicketStatus.Open], // Can reopen
+      [TicketStatus.Closed]: [], // Terminal state
+    };
+
+    const allowed = allowedTransitions[from];
+    if (!allowed.includes(to)) {
+      throw new BadRequestException(
+        `Invalid status transition from ${from} to ${to}`,
+      );
+    }
+
+    // Only admins can reopen resolved tickets
+    if (
+      from === TicketStatus.Resolved &&
+      to === TicketStatus.Open &&
+      userRole !== UserRole.Admin
+    ) {
+      throw new ForbiddenException('Only admins can reopen resolved tickets');
+    }
+  }
+
+  private canViewTicket(
+    user: TicketActor,
+    ticket: { departmentId: string; filedByUserId: string },
+  ): boolean {
+    switch (user.role) {
+      case UserRole.Admin:
+        return true;
+      case UserRole.ItStaff:
+        return true;
+      case UserRole.DepartmentHead:
+        return user.departmentId === ticket.departmentId;
+      case UserRole.Employee:
+        return user.id === ticket.filedByUserId;
+      default:
+        return false;
+    }
+  }
+
+  private canUpdateTicket(
+    user: TicketActor,
+    ticket: { departmentId: string; filedByUserId: string },
+  ): boolean {
+    switch (user.role) {
+      case UserRole.Admin:
+        return true;
+      case UserRole.ItStaff:
+        return true;
+      case UserRole.DepartmentHead:
+        return user.departmentId === ticket.departmentId;
+      case UserRole.Employee:
+        return user.id === ticket.filedByUserId;
+      default:
+        return false;
+    }
   }
 }
