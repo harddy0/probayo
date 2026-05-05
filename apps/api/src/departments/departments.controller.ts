@@ -31,7 +31,6 @@ export class DepartmentsController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   @Roles(UserRole.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new department' })
@@ -65,7 +64,6 @@ export class DepartmentsController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   @Roles(UserRole.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update an existing department' })
@@ -85,7 +83,6 @@ export class DepartmentsController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   @Roles(UserRole.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a department by ID' })

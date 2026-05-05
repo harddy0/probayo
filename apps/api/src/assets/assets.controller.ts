@@ -33,7 +33,6 @@ export class AssetsController {
 
   @Post()
   @UseGuards(RolesGuard)
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   @Roles(UserRole.Admin, UserRole.ItStaff)
   @ApiOperation({ summary: 'Create a new asset' })
   @ApiBody({ type: CreateAssetDto })
@@ -63,7 +62,6 @@ export class AssetsController {
 
   @Patch(':id')
   @UseGuards(RolesGuard)
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   @Roles(UserRole.Admin, UserRole.ItStaff)
   @ApiOperation({ summary: 'Update an existing asset' })
   @ApiParam({

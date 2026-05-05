@@ -35,7 +35,6 @@ export class UserDataDto {
     example: 'Employee',
     description: 'User role',
   })
-  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
   role: UserRole | undefined;
 
   @ApiProperty({

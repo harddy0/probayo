@@ -53,10 +53,10 @@ export class UsersService {
     const { departmentId, ...userData } = updateUserDto;
     const data: any = { ...userData };
     if (departmentId !== null && departmentId !== undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       data.departmentId = departmentId;
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
     return await this.prisma.user.update({
       where: { id },
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment

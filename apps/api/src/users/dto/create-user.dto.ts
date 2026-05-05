@@ -57,12 +57,11 @@ export class CreateUserDto {
 
   @ApiProperty({
     description: 'User role in the system',
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
     enum: UserRole,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
     example: UserRole.Employee,
   })
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
   @IsEnum(UserRole)
   role!: UserRole;
 
