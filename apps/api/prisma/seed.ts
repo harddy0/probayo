@@ -1,5 +1,5 @@
 // prisma/seed.ts
-import { PrismaClient, PriorityLevel } from '@prisma/client';
+import { PrismaClient, PriorityLevel, UserRole } from '@prisma/client';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import 'dotenv/config';
 
@@ -23,10 +23,14 @@ const prisma = new PrismaClient({
   log: ['error', 'warn'],
 });
 
+// bcrypt hash of "password"
+const DEFAULT_PASSWORD_HASH =
+  '$2b$10$jXykLq8p2eKYgKRhl0W5.uKLMF91.Nl2FbDXeNA83TnI98w9XAjoS';
+
 async function main() {
   console.log('🌱 Seeding database...');
 
-  // Seed SLA Policies
+  // ─── SLA Policies ────────────────────────────────────────────────────────────
   console.log('📋 Seeding SLA policies...');
   const slaPolicies = [
     {
@@ -62,7 +66,7 @@ async function main() {
     );
   }
 
-  // Seed Ticket Categories (optional but recommended)
+  // ─── Ticket Categories ────────────────────────────────────────────────────────
   console.log('📂 Seeding ticket categories...');
   const categories = [
     {
@@ -113,7 +117,88 @@ async function main() {
     console.log(`  ✅ Category: ${category.name}`);
   }
 
+  // ─── Base Department (required for DepartmentHead) ────────────────────────────
+  console.log('🏢 Seeding base department...');
+  const itDepartment = await prisma.department.upsert({
+    where: { id: 'dept_it' },
+    update: {},
+    create: {
+      id: 'dept_it',
+      name: 'IT Department',
+    },
+  });
+  console.log(`  ✅ Department: ${itDepartment.name}`);
+
+  // ─── Base Users ───────────────────────────────────────────────────────────────
+  console.log('👤 Seeding base users...');
+
+  const baseUsers = [
+    {
+      id: 'user_admin',
+      email: 'admin@admin.com',
+      firstName: 'System',
+      lastName: 'Admin',
+      role: UserRole.Admin,
+      departmentId: null,
+    },
+    {
+      id: 'user_it_staff',
+      email: 'itstaff@itstaff.com',
+      firstName: 'IT',
+      lastName: 'Staff',
+      role: UserRole.ItStaff,
+      departmentId: itDepartment.id,
+    },
+    {
+      id: 'user_employee',
+      email: 'employee@employee.com',
+      firstName: 'Sample',
+      lastName: 'Employee',
+      role: UserRole.Employee,
+      departmentId: itDepartment.id,
+    },
+    {
+      id: 'user_dept_head',
+      email: 'departmenthead@departmenthead.com',
+      firstName: 'Department',
+      lastName: 'Head',
+      role: UserRole.DepartmentHead,
+      departmentId: itDepartment.id,
+    },
+  ];
+
+  for (const user of baseUsers) {
+    await prisma.user.upsert({
+      where: { email: user.email },
+      update: {},
+      create: {
+        id: user.id,
+        email: user.email,
+        passwordHash: DEFAULT_PASSWORD_HASH,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        departmentId: user.departmentId,
+        isActive: true,
+      },
+    });
+    console.log(`  ✅ User: ${user.email} (${user.role})`);
+  }
+
+  // Assign the DepartmentHead user as the head of the IT department
+  await prisma.department.update({
+    where: { id: itDepartment.id },
+    data: { headUserId: 'user_dept_head' },
+  });
+  console.log(`  🔗 Linked department head to IT Department`);
+
   console.log('🎉 Seeding complete!');
+  console.log('');
+  console.log('📝 Seeded credentials (password: "password" for all):');
+  console.log('   admin@admin.com               → Admin');
+  console.log('   itstaff@itstaff.com           → IT Staff');
+  console.log('   employee@employee.com         → Employee');
+  console.log('   departmenthead@departmenthead.com → Department Head');
 }
 
 main()

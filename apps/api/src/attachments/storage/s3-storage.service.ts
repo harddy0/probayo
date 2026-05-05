@@ -19,7 +19,9 @@ export class S3StorageService implements IStorageService {
   constructor(private configService: ConfigService) {
     const region = this.configService.get<string>('AWS_REGION');
     const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-    const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
+    const secretAccessKey = this.configService.get<string>(
+      'AWS_SECRET_ACCESS_KEY',
+    );
 
     const s3Config: S3ClientConfig = {};
     if (region) s3Config.region = region;

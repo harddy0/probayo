@@ -98,7 +98,10 @@ export class SlaController {
     type: SlaPolicyResponseDto,
   })
   // eslint-disable-next-line prettier/prettier
-  update(@Param('id') id: string, @Body() updateSlaPolicyDto: UpdateSlaPolicyDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateSlaPolicyDto: UpdateSlaPolicyDto,
+  ) {
     return this.slaService.update(id, updateSlaPolicyDto);
   }
 

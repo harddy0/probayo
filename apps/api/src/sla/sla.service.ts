@@ -7,14 +7,21 @@ import { UpdateSlaPolicyDto } from './dto/update-sla-policy.dto';
 @Injectable()
 export class SlaService {
   // Default fallback values if no policy exists in database
-  private readonly defaultPolicies = {
-    critical: { ack: 15, resolution: 240 }, // 15 minutes, 4 hours
-    high: { ack: 30, resolution: 480 }, // 30 minutes, 8 hours
-    medium: { ack: 60, resolution: 1440 }, // 1 hour, 24 hours
-    low: { ack: 240, resolution: 2880 }, // 4 hours, 48 hours
+  private readonly defaultPolicies: Record<
+    PriorityLevel,
+    { ack: number; resolution: number }
+  > = {
+    [PriorityLevel.Critical]: { ack: 15, resolution: 240 }, // 15 minutes, 4 hours
+    [PriorityLevel.High]: { ack: 30, resolution: 480 }, // 30 minutes, 8 hours
+    [PriorityLevel.Medium]: { ack: 60, resolution: 1440 }, // 1 hour, 24 hours
+    [PriorityLevel.Low]: { ack: 240, resolution: 2880 }, // 4 hours, 48 hours
   };
 
   constructor(private readonly prisma: PrismaService) {}
+
+  private toLocalWallClock(date: Date): Date {
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
+  }
 
   // ==================== CRUD Operations ====================
 
@@ -73,12 +80,9 @@ export class SlaService {
     const policy = await this.findByPriority(priority);
     if (!policy) {
       // Return default values if no policy configured
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const defaults = this.defaultPolicies[priority];
       return {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         acknowledgementMinutes: defaults.ack,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         resolutionMinutes: defaults.resolution,
       };
     }
@@ -91,13 +95,14 @@ export class SlaService {
     startDate: Date = new Date(),
   ) {
     const policy = await this.getPolicy(priority);
+    const localStartDate = this.toLocalWallClock(startDate);
 
     return {
       ack: new Date(
-        startDate.getTime() + policy.acknowledgementMinutes * 60 * 1000,
+        localStartDate.getTime() + policy.acknowledgementMinutes * 60 * 1000,
       ),
       resolution: new Date(
-        startDate.getTime() + policy.resolutionMinutes * 60 * 1000,
+        localStartDate.getTime() + policy.resolutionMinutes * 60 * 1000,
       ),
     };
   }
@@ -125,7 +130,7 @@ export class SlaService {
     slaResolutionDeadline: Date;
     status: string;
   }) {
-    const now = new Date();
+    const now = this.toLocalWallClock(new Date());
 
     // Don't check closed or resolved tickets
     if (ticket.status === 'closed' || ticket.status === 'resolved') {
@@ -150,11 +155,17 @@ export class SlaService {
 
     const { ackBreached, resolutionBreached } = this.checkBreaches(ticket);
 
+    // FIX 3: Only set to true if breached, NEVER flip false back to true
+    // Once a breach flag is true, it stays true forever
     return this.prisma.ticket.update({
       where: { id: ticketId },
       data: {
-        slaAckBreached: ackBreached,
-        slaResolutionBreached: resolutionBreached,
+        // If current check says breached → set to true
+        // If current check says not breached → keep existing value (don't flip back)
+        slaAckBreached: ackBreached ? true : ticket.slaAckBreached,
+        slaResolutionBreached: resolutionBreached
+          ? true
+          : ticket.slaResolutionBreached,
       },
     });
   }
@@ -172,7 +183,7 @@ export class SlaService {
   // ==================== Utility Methods ====================
 
   getTimeRemaining(deadline: Date): { minutes: number; isBreached: boolean } {
-    const now = new Date();
+    const now = this.toLocalWallClock(new Date());
     const minutesRemaining = Math.floor(
       (deadline.getTime() - now.getTime()) / (60 * 1000),
     );
