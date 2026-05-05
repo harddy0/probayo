@@ -1,18 +1,22 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { BullModule } from '@nestjs/bullmq';
+import * as Joi from 'joi';
+import { join } from 'path';
+
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { DepartmentsModule } from './departments/departments.module';
 import { AssetsModule } from './assets/assets.module';
-import * as Joi from 'joi';
-import { join } from 'path';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { SlaModule } from './sla/sla.module';
 import { CommentsModule } from './comments/comments.module';
 import { AttachmentsModule } from './attachments/attachments.module';
+
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { FilesProcessor } from './queues/files.processor';
 
 @Module({
   imports: [
@@ -25,8 +29,40 @@ import { AttachmentsModule } from './attachments/attachments.module';
       validationSchema: Joi.object({
         DATABASE_URL: Joi.string().required(),
         PORT: Joi.number().required(),
+        REDIS_URL: Joi.string().optional(),
+        REDIS_HOST: Joi.string().optional(),
+        REDIS_PORT: Joi.number().optional(),
+        REDIS_USERNAME: Joi.string().optional(),
+        REDIS_PASSWORD: Joi.string().optional(),
       }),
     }),
+
+    BullModule.forRoot({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      connection: (() => {
+        const url = process.env.REDIS_URL;
+        if (url) return { url };
+
+        const host = process.env.REDIS_HOST ?? '127.0.0.1';
+        const port = process.env.REDIS_PORT
+          ? Number(process.env.REDIS_PORT)
+          : 6379;
+        const conn: any = { host, port };
+        if (process.env.REDIS_USERNAME)
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          conn.username = process.env.REDIS_USERNAME;
+        if (process.env.REDIS_PASSWORD)
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          conn.password = process.env.REDIS_PASSWORD;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        if (process.env.REDIS_DB) conn.db = Number(process.env.REDIS_DB);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+        return conn;
+      })(),
+    }),
+
+    BullModule.registerQueue({ name: 'files' }),
+
     PrismaModule,
     UsersModule,
     DepartmentsModule,
@@ -38,6 +74,6 @@ import { AttachmentsModule } from './attachments/attachments.module';
     AttachmentsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, FilesProcessor],
 })
 export class AppModule {}
