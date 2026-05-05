@@ -27,8 +27,8 @@ export class S3StorageService implements IStorageService {
     if (region) s3Config.region = region;
     if (accessKeyId && secretAccessKey) {
       // both credentials present — set them
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      s3Config.credentials = { accessKeyId, secretAccessKey } as any;
+
+      s3Config.credentials = { accessKeyId, secretAccessKey };
     }
 
     this.s3 = new S3Client(s3Config);
@@ -38,9 +38,8 @@ export class S3StorageService implements IStorageService {
   async save(file: MulterFile, ticketId: string): Promise<string> {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const key = `tickets/${ticketId}/${Date.now()}-${file.originalname}`;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+
     await this.s3.send(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       new PutObjectCommand({
         Bucket: this.bucket,
         Key: key,
@@ -54,16 +53,14 @@ export class S3StorageService implements IStorageService {
   }
 
   async get(key: string): Promise<Buffer> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const response = await this.s3.send(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       new GetObjectCommand({
         Bucket: this.bucket,
         Key: key,
       }),
     );
     // Guard against empty body
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
     if (!response.Body) {
       throw new Error('Empty response body from S3');
     }
@@ -85,9 +82,7 @@ export class S3StorageService implements IStorageService {
   }
 
   async delete(key: string): Promise<void> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     await this.s3.send(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       new DeleteObjectCommand({
         Bucket: this.bucket,
         Key: key,

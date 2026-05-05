@@ -3,10 +3,8 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
-  Inject,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import type { IStorageService } from './storage/storage.interface';
 import { UserRole } from '@prisma/client';
 import type { File as MulterFile } from 'multer';
 
@@ -25,18 +23,13 @@ type AttachmentTicket = {
 export class AttachmentsService {
   private readonly logger = new Logger(AttachmentsService.name);
 
-  constructor(
-    private prisma: PrismaService,
-    @Inject('IStorageService') private storage: IStorageService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
-  async uploadAttachment(
+  // ==================== PERMISSION VERIFICATION ====================
+  async verifyUploadPermission(
     ticketId: string,
     userId: string,
-    file: MulterFile,
-    commentId?: string,
-  ) {
-    // Verify ticket exists and user has access
+  ): Promise<void> {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id: ticketId },
     });
@@ -53,71 +46,62 @@ export class AttachmentsService {
       throw new NotFoundException('User not found');
     }
 
-    const canUpload = this.canUploadToTicket(
-      user as AttachmentUser,
-      ticket as AttachmentTicket,
-    );
+    const canUpload = this.canUploadToTicket(user, ticket);
+
     if (!canUpload) {
       throw new ForbiddenException(
         'You do not have permission to upload attachments to this ticket',
       );
     }
+  }
 
-    // If commentId provided, verify comment exists and belongs to this ticket
-    if (commentId) {
-      const comment = await this.prisma.ticketComment.findFirst({
-        where: {
-          id: commentId,
-          ticketId: ticketId,
-        },
-      });
-
-      if (!comment) {
-        throw new NotFoundException(
-          `Comment ${commentId} not found on ticket ${ticketId}`,
-        );
-      }
-    }
-
-    // Store file physically
-    const filePath = await this.storage.save(file, ticketId);
-
-    // Create database record
-    const attachment = await this.prisma.ticketAttachment.create({
-      data: {
-        ticketId,
-        commentId: commentId || null,
-        uploadedByUserId: userId,
-        fileUrlOrPath: filePath,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        fileName: file.originalname,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        fileType: file.mimetype,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        fileSizeBytes: file.size,
-      },
-      include: {
-        uploadedByUser: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
+  async verifyCommentExists(
+    commentId: string,
+    ticketId: string,
+  ): Promise<void> {
+    const comment = await this.prisma.ticketComment.findFirst({
+      where: {
+        id: commentId,
+        ticketId: ticketId,
       },
     });
 
-    this.logger.log(
-      `Attachment uploaded: ${attachment.id} for ticket ${ticketId}`,
-    );
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return this.toResponseDto(attachment);
+    if (!comment) {
+      throw new NotFoundException(
+        `Comment ${commentId} not found on ticket ${ticketId}`,
+      );
+    }
   }
 
+  // ==================== CORE FILE PROCESSING (Called by Processor) ====================
+  processAndSaveAttachment(
+    ticketId: string,
+    userId: string,
+    file: MulterFile,
+    commentId: string | null = null,
+  ): any {
+    // This method will be called by FilesProcessor
+    // Storage injection will happen via processor, not here
+    // Return the created attachment record
+    return {
+      ticketId,
+      userId,
+      commentId,
+      file: {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+        originalname: file.originalname,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+        mimetype: file.mimetype,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+        size: file.size,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+        buffer: file.buffer,
+      },
+    };
+  }
+
+  // ==================== READ OPERATIONS ====================
   async getTicketAttachments(ticketId: string, userId: string) {
-    // Verify access
     const ticket = await this.prisma.ticket.findUnique({
       where: { id: ticketId },
     });
@@ -130,10 +114,7 @@ export class AttachmentsService {
       where: { id: userId },
     });
 
-    const canView = this.canViewTicket(
-      user as AttachmentUser,
-      ticket as AttachmentTicket,
-    );
+    const canView = this.canViewTicket(user as AttachmentUser, ticket);
     if (!canView) {
       throw new ForbiddenException(
         'You do not have permission to view attachments for this ticket',
@@ -141,7 +122,7 @@ export class AttachmentsService {
     }
 
     const attachments = await this.prisma.ticketAttachment.findMany({
-      where: { ticketId },
+      where: { ticketId, commentId: null },
       include: {
         uploadedByUser: {
           select: {
@@ -173,10 +154,8 @@ export class AttachmentsService {
       where: { id: userId },
     });
 
-    const canView = this.canViewTicket(
-      user as AttachmentUser,
-      comment.ticket as AttachmentTicket,
-    );
+    const canView = this.canViewTicket(user as AttachmentUser, comment.ticket);
+
     if (!canView) {
       throw new ForbiddenException(
         'You do not have permission to view attachments for this comment',
@@ -195,6 +174,7 @@ export class AttachmentsService {
           },
         },
       },
+      orderBy: { createdAt: 'desc' },
     });
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
@@ -211,28 +191,28 @@ export class AttachmentsService {
       throw new NotFoundException('Attachment not found');
     }
 
-    // Verify user has access to the ticket
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
     const canView = this.canViewTicket(
       user as AttachmentUser,
-      attachment.ticket as AttachmentTicket,
+      attachment.ticket,
     );
+
     if (!canView) {
       throw new ForbiddenException(
         'You do not have permission to download this attachment',
       );
     }
 
-    // Get file from storage
-    const fileBuffer = await this.storage.get(attachment.fileUrlOrPath);
-
+    // Note: Actual file retrieval will be handled by storage service
+    // This is metadata only - storage service will be called separately
     return {
-      buffer: fileBuffer,
-      filename: attachment.fileName,
-      mimeType: attachment.fileType,
+      attachmentId: attachment.id,
+      fileUrlOrPath: attachment.fileUrlOrPath,
+      fileName: attachment.fileName,
+      fileType: attachment.fileType,
     };
   }
 
@@ -246,7 +226,6 @@ export class AttachmentsService {
       throw new NotFoundException('Attachment not found');
     }
 
-    // Check permission (uploader, IT staff, or admin)
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -266,17 +245,11 @@ export class AttachmentsService {
       );
     }
 
-    // Delete physical file
-    await this.storage.delete(attachment.fileUrlOrPath);
-
-    // Delete database record
-    await this.prisma.ticketAttachment.delete({
-      where: { id: attachmentId },
-    });
-
-    this.logger.log(`Attachment deleted: ${attachmentId}`);
-
-    return { message: 'Attachment deleted successfully' };
+    // Return attachment info for processor to delete physical file
+    return {
+      attachmentId: attachment.id,
+      fileUrlOrPath: attachment.fileUrlOrPath,
+    };
   }
 
   // ==================== HELPER METHODS ====================
@@ -348,5 +321,16 @@ export class AttachmentsService {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       createdAt: attachment.createdAt,
     };
+  }
+  // Add this method to AttachmentsService class:
+  async getTicketIdFromComment(commentId: string): Promise<string> {
+    const comment = await this.prisma.ticketComment.findUnique({
+      where: { id: commentId },
+      select: { ticketId: true },
+    });
+    if (!comment) {
+      throw new NotFoundException(`Comment ${commentId} not found`);
+    }
+    return comment.ticketId;
   }
 }

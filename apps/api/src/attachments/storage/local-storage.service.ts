@@ -18,13 +18,13 @@ export class LocalStorageService {
       await fs.mkdir(this.uploadDir, { recursive: true });
       this.logger.log(`Upload directory created at ${this.uploadDir}`);
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      this.logger.error(`Failed to create upload directory: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to create upload directory: ${message}`);
     }
   }
 
   async save(file: MulterFile, ticketId: string): Promise<string> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const filename = `${randomUUID()}-${file.originalname}`;
     const ticketDir = path.join(this.uploadDir, 'tickets', ticketId);
 
@@ -48,8 +48,8 @@ export class LocalStorageService {
       await fs.unlink(filePath);
       this.logger.log(`File deleted: ${filePath}`);
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      this.logger.error(`Failed to delete file: ${filePath}`, error.message);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to delete file: ${filePath}`, message);
       throw error;
     }
   }

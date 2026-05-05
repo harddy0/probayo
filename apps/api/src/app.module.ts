@@ -16,7 +16,6 @@ import { AttachmentsModule } from './attachments/attachments.module';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { FilesProcessor } from './queues/files.processor';
 
 @Module({
   imports: [
@@ -74,6 +73,6 @@ import { FilesProcessor } from './queues/files.processor';
     AttachmentsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, FilesProcessor],
+  providers: [AppService],
 })
 export class AppModule {}
