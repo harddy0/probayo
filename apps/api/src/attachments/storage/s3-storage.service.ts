@@ -10,6 +10,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { IStorageService } from './storage.interface';
 import type { File as MulterFile } from 'multer';
+import { Readable } from 'stream';
 
 @Injectable()
 export class S3StorageService implements IStorageService {
@@ -33,6 +34,21 @@ export class S3StorageService implements IStorageService {
 
     this.s3 = new S3Client(s3Config);
     this.bucket = this.configService.get<string>('AWS_S3_BUCKET') ?? '';
+  }
+  async getStream(key: string): Promise<Readable> {
+    const response = await this.s3.send(
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      }),
+    );
+
+    if (!response.Body) {
+      throw new Error('Empty response body from S3');
+    }
+
+    // S3 returns ReadableStream that we can pipe directly
+    return response.Body as unknown as Readable;
   }
 
   async save(file: MulterFile, ticketId: string): Promise<string> {

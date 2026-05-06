@@ -3,6 +3,8 @@ import { randomUUID } from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { File as MulterFile } from 'multer';
+import { createReadStream } from 'fs';
+import { Readable } from 'stream';
 
 @Injectable()
 export class LocalStorageService {
@@ -62,5 +64,13 @@ export class LocalStorageService {
       size: stats.size,
       modified: stats.mtime,
     };
+  }
+  getStream(filePath: string): Promise<Readable> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+    return Promise.resolve(createReadStream(filePath));
+  }
+  async getFileSize(filePath: string): Promise<number> {
+    const stats = await fs.stat(filePath);
+    return stats.size;
   }
 }

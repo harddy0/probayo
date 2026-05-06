@@ -1,6 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
+import { BullBoardModule } from '@bull-board/nestjs';
+import { ExpressAdapter } from '@bull-board/express';
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import * as Joi from 'joi';
 import { join } from 'path';
 
@@ -16,6 +21,7 @@ import { AttachmentsModule } from './attachments/attachments.module';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { QueuesModule } from './queues/queues.module';
 
 @Module({
   imports: [
@@ -62,6 +68,29 @@ import { AppService } from './app.service';
 
     BullModule.registerQueue({ name: 'files' }),
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 1 minute window
+        limit: 10, // 10 requests per minute per IP
+      },
+    ]),
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    ScheduleModule.forRoot(),
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    BullBoardModule.forRoot({
+      route: '/admin/queues',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      adapter: ExpressAdapter,
+    }),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    BullBoardModule.forFeature({
+      name: 'files',
+      adapter: BullMQAdapter,
+    }),
+
     PrismaModule,
     UsersModule,
     DepartmentsModule,
@@ -71,6 +100,7 @@ import { AppService } from './app.service';
     SlaModule,
     CommentsModule,
     AttachmentsModule,
+    QueuesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

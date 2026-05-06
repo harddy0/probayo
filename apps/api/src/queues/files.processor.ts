@@ -3,7 +3,26 @@ import { Job } from 'bullmq';
 import { Inject, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as storageInterface from '../attachments/storage/storage.interface';
-import { FileJobData, FileJobResult } from './interfaces/file-job.interface';
+import { FailedJobsService } from './failed-jobs.service';
+
+interface FileJobData {
+  ticketId: string;
+  userId: string;
+  commentId: string | null;
+  file: {
+    originalname: string;
+    mimetype: string;
+    size: number;
+    buffer: any;
+  };
+}
+
+interface FileJobResult {
+  success: boolean;
+  attachmentId?: string;
+  filePath?: string;
+  error?: string;
+}
 
 @Processor('files')
 export class FilesProcessor extends WorkerHost {
@@ -13,6 +32,7 @@ export class FilesProcessor extends WorkerHost {
     private prisma: PrismaService,
     @Inject('IStorageService')
     private storage: storageInterface.IStorageService,
+    private failedJobsService: FailedJobsService,
   ) {
     super();
   }
@@ -22,13 +42,11 @@ export class FilesProcessor extends WorkerHost {
   ): Promise<FileJobResult> {
     const { ticketId, userId, commentId, file } = job.data;
 
-    this.logger.log(
-      `[Job ${job.id}] Processing file: ${file.originalname} for ticket ${ticketId}`,
-    );
+    this.logger.log(`[Job ${job.id}] Processing: ${file.originalname}`);
 
     try {
-      // FIX: Reconstruct buffer from serialized data
-      this.logger.debug(`[Job ${job.id}] Reconstructing file buffer...`);
+      await job.updateProgress(10);
+
       let fileBuffer: Buffer;
 
       if (file.buffer) {
@@ -55,12 +73,8 @@ export class FilesProcessor extends WorkerHost {
         throw new Error('No buffer data in job');
       }
 
-      this.logger.debug(
-        `[Job ${job.id}] Buffer size: ${fileBuffer.length} bytes`,
-      );
       await job.updateProgress(25);
 
-      // Create Multer-like file object
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const multerFile = {
         originalname: file.originalname,
@@ -68,14 +82,10 @@ export class FilesProcessor extends WorkerHost {
         size: file.size,
         buffer: fileBuffer,
       } as any;
-      // Save to storage
-      this.logger.debug(`[Job ${job.id}] Saving file to storage...`);
+
       const filePath = await this.storage.save(multerFile, ticketId);
-      this.logger.debug(`[Job ${job.id}] File saved at: ${filePath}`);
       await job.updateProgress(50);
 
-      // Create database record
-      this.logger.debug(`[Job ${job.id}] Creating database record...`);
       const attachment = await this.prisma.ticketAttachment.create({
         data: {
           ticketId,
@@ -87,10 +97,10 @@ export class FilesProcessor extends WorkerHost {
           fileSizeBytes: file.size,
         },
       });
-      await job.updateProgress(75);
-      this.logger.log(`[Job ${job.id}] Attachment created: ${attachment.id}`);
 
-      // Update ticket timestamp
+      await job.updateProgress(75);
+      this.logger.log(`[Job ${job.id}] Attachment: ${attachment.id}`);
+
       await this.prisma.ticket.update({
         where: { id: ticketId },
         data: { updatedAt: new Date() },
@@ -105,6 +115,12 @@ export class FilesProcessor extends WorkerHost {
       };
     } catch (error) {
       this.logger.error(`[Job ${job.id}] Failed:`, error);
+
+      const maxRetries = job.opts.attempts || 3;
+      if (job.attemptsMade >= maxRetries) {
+        await this.failedJobsService.recordFailedJob(job, error as Error);
+      }
+
       throw error;
     }
   }

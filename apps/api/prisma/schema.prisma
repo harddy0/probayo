@@ -313,3 +313,15 @@ model ReportLog {
 
   @@map("report_logs")
 }
+
+model FailedJob {
+  id          String   @id @default(uuid()) @db.Char(36)
+  queue       String   @db.VarChar(255)
+  payload     Json
+  exception   String   @db.Text
+  failed_at   DateTime @default(now()) @db.DateTime(0)
+  resolved_at DateTime? @db.DateTime(0)
+  retry_count Int      @default(0)
+
+  @@map("failed_jobs")
+}

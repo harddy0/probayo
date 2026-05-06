@@ -13,6 +13,7 @@ import {
   Inject,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import {
   ApiBearerAuth,
@@ -117,6 +118,8 @@ export class AttachmentsController {
     status: 403,
     description: 'Permission denied',
   })
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async uploadToTicket(
     @Param('ticketId') ticketId: string,
     @UploadedFile() file: MulterFile,
@@ -193,6 +196,8 @@ export class AttachmentsController {
     status: 404,
     description: 'Comment not found',
   })
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async uploadToComment(
     @Param('commentId') commentId: string,
     @UploadedFile() file: MulterFile,
@@ -246,6 +251,8 @@ export class AttachmentsController {
   @ApiOperation({ summary: 'Check upload job status' })
   @ApiParam({ name: 'jobId', description: 'BullMQ Job ID' })
   @ApiResponse({ status: 200, description: 'Returns job status' })
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  @SkipThrottle()
   async getJobStatus(@Param('jobId') jobId: string) {
     const job = await this.filesQueue.getJob(jobId);
     if (!job) {
@@ -308,29 +315,34 @@ export class AttachmentsController {
     );
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  @SkipThrottle()
   @Get(':id/download')
-  @ApiOperation({ summary: 'Download an attachment' })
+  @ApiOperation({ summary: 'Download an attachment (streaming)' })
   @ApiParam({ name: 'id', description: 'Attachment UUID' })
-  @ApiResponse({ status: 200, description: 'Returns the file' })
+  @ApiResponse({ status: 200, description: 'Returns the file stream' })
   async download(
     @Param('id') id: string,
     @Request() req: { user: { id: string } },
     @Res() res: Response,
   ) {
-    const { fileUrlOrPath, fileName, fileType } =
-      await this.attachmentsService.downloadAttachment(id, req.user.id);
-    // Retrieve file from storage
-    const buffer = await this.storage.get(fileUrlOrPath);
+    const { stream, fileName, fileType, fileSize } =
+      await this.attachmentsService.getDownloadStream(id, req.user.id);
+
     res.setHeader('Content-Type', fileType);
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.setHeader('Content-Length', buffer.length);
-    res.send(buffer);
+    res.setHeader('Content-Length', fileSize);
+
+    // Pipe the stream to response
+    stream.pipe(res);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete an attachment' })
   @ApiParam({ name: 'id', description: 'Attachment UUID' })
   @ApiResponse({ status: 200, description: 'Attachment deleted successfully' })
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  @SkipThrottle()
   async delete(
     @Param('id') id: string,
     @Request() req: { user: { id: string } },

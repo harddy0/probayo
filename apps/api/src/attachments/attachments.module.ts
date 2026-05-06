@@ -8,7 +8,6 @@ import { S3StorageService } from './storage/s3-storage.service';
 import { IStorageService } from './storage/storage.interface';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuthModule } from '../auth/auth.module';
-import { FilesProcessor } from '../queues/files.processor';
 
 @Module({
   imports: [
@@ -19,7 +18,6 @@ import { FilesProcessor } from '../queues/files.processor';
   controllers: [AttachmentsController],
   providers: [
     AttachmentsService,
-    FilesProcessor, // Add the processor
     {
       provide: 'IStorageService',
       useFactory: (configService: ConfigService): IStorageService => {
@@ -35,6 +33,6 @@ import { FilesProcessor } from '../queues/files.processor';
       inject: [ConfigService],
     },
   ],
-  exports: [AttachmentsService],
+  exports: [AttachmentsService, 'IStorageService'],
 })
 export class AttachmentsModule {}

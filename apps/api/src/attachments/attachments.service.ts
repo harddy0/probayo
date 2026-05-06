@@ -3,10 +3,13 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
+  Inject,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import type { File as MulterFile } from 'multer';
+import { Readable } from 'stream';
+import type { IStorageService } from './storage/storage.interface';
 
 type AttachmentUser = {
   id: string;
@@ -22,8 +25,10 @@ type AttachmentTicket = {
 @Injectable()
 export class AttachmentsService {
   private readonly logger = new Logger(AttachmentsService.name);
-
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject('IStorageService') private storage: IStorageService,
+  ) {}
 
   // ==================== PERMISSION VERIFICATION ====================
   async verifyUploadPermission(
@@ -332,5 +337,49 @@ export class AttachmentsService {
       throw new NotFoundException(`Comment ${commentId} not found`);
     }
     return comment.ticketId;
+  }
+  async getDownloadStream(
+    attachmentId: string,
+    userId: string,
+  ): Promise<{
+    stream: Readable;
+    fileName: string;
+    fileType: string;
+    fileSize: number;
+  }> {
+    const attachment = await this.prisma.ticketAttachment.findUnique({
+      where: { id: attachmentId },
+      include: { ticket: true },
+    });
+
+    if (!attachment) {
+      throw new NotFoundException('Attachment not found');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    const canView = this.canViewTicket(
+      user as AttachmentUser,
+      attachment.ticket,
+    );
+
+    if (!canView) {
+      throw new ForbiddenException(
+        'You do not have permission to download this attachment',
+      );
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const stream = await this.storage.getStream(attachment.fileUrlOrPath);
+
+    return {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      stream,
+      fileName: attachment.fileName,
+      fileType: attachment.fileType,
+      fileSize: attachment.fileSizeBytes || 0,
+    };
   }
 }
