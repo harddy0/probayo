@@ -129,22 +129,25 @@ export class SlaService {
     slaAckDeadline: Date;
     slaResolutionDeadline: Date;
     status: string;
-  }) {
-    const now = this.toLocalWallClock(new Date());
+  }): { ackBreached: boolean; resolutionBreached: boolean } {
+    const now = new Date();
 
-    // Don't check closed or resolved tickets
     if (ticket.status === 'closed' || ticket.status === 'resolved') {
       return { ackBreached: false, resolutionBreached: false };
     }
 
-    return {
-      ackBreached: !ticket.acknowledgedAt && now > ticket.slaAckDeadline,
-      resolutionBreached:
-        !ticket.resolvedAt && now > ticket.slaResolutionDeadline,
-    };
+    if (ticket.status === 'pending_user') {
+      return { ackBreached: false, resolutionBreached: false };
+    }
+
+    const ackBreached = !ticket.acknowledgedAt && now > ticket.slaAckDeadline;
+    const resolutionBreached =
+      !ticket.resolvedAt && now > ticket.slaResolutionDeadline;
+
+    return { ackBreached, resolutionBreached };
   }
 
-  async updateBreachStatus(ticketId: string) {
+  async updateBreachStatus(ticketId: string): Promise<void> {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id: ticketId },
     });
@@ -153,20 +156,34 @@ export class SlaService {
       throw new NotFoundException(`Ticket ${ticketId} not found`);
     }
 
-    const { ackBreached, resolutionBreached } = this.checkBreaches(ticket);
+    const { ackBreached, resolutionBreached } = this.checkBreaches({
+      acknowledgedAt: ticket.acknowledgedAt,
+      resolvedAt: ticket.resolvedAt,
+      slaAckDeadline: ticket.slaAckDeadline,
+      slaResolutionDeadline: ticket.slaResolutionDeadline,
+      status: ticket.status,
+    });
 
-    // FIX 3: Only set to true if breached, NEVER flip false back to true
-    // Once a breach flag is true, it stays true forever
-    return this.prisma.ticket.update({
+    const updates: {
+      slaAckBreached?: boolean;
+      slaResolutionBreached?: boolean;
+    } = {};
+
+    if (ackBreached && !ticket.slaAckBreached) {
+      updates.slaAckBreached = true;
+    }
+
+    if (resolutionBreached && !ticket.slaResolutionBreached) {
+      updates.slaResolutionBreached = true;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return;
+    }
+
+    await this.prisma.ticket.update({
       where: { id: ticketId },
-      data: {
-        // If current check says breached → set to true
-        // If current check says not breached → keep existing value (don't flip back)
-        slaAckBreached: ackBreached ? true : ticket.slaAckBreached,
-        slaResolutionBreached: resolutionBreached
-          ? true
-          : ticket.slaResolutionBreached,
-      },
+      data: updates,
     });
   }
 
