@@ -15,7 +15,6 @@ export class FailedJobsService {
       await this.prisma.failedJob.create({
         data: {
           queue: job.queueName,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           payload: job.data,
           exception: `${error.message}\n${error.stack || ''}`,
           retry_count: job.attemptsMade,
@@ -40,7 +39,7 @@ export class FailedJobsService {
   }
 
   async retryFailedJob(id: string): Promise<boolean> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const failedJob = await this.prisma.failedJob.findUnique({
       where: { id },
     });

@@ -371,11 +371,9 @@ export class AttachmentsService {
       );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const stream = await this.storage.getStream(attachment.fileUrlOrPath);
 
     return {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       stream,
       fileName: attachment.fileName,
       fileType: attachment.fileType,

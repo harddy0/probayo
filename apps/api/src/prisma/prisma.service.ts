@@ -32,6 +32,8 @@ export class PrismaService
 
   async onModuleInit() {
     await this.$connect();
+    // Ensure DB-generated timestamps use UTC for consistency.
+    await this.$executeRaw`SET time_zone = '+00:00'`;
   }
 
   async onModuleDestroy() {

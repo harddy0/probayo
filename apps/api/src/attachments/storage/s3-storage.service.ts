@@ -92,6 +92,7 @@ export class S3StorageService implements IStorageService {
     const stream = response.Body as unknown as NodeJS.ReadableStream;
     const chunks: Buffer[] = [];
     for await (const chunk of stream as any) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
     return Buffer.concat(chunks);
