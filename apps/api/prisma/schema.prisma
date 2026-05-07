@@ -262,13 +262,14 @@ model EscalationRule {
 }
 
 model EscalationEvent {
-  id             String   @id @default(uuid()) @db.Char(36)
-  ticketId       String   @map("ticket_id") @db.Char(36)
-  ticket         Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  escalationLevel Int     @map("escalation_level")
-  notifiedUserId String   @map("notified_user_id") @db.Char(36)
-  notifiedUser   User     @relation("EscalationNotifiedUser", fields: [notifiedUserId], references: [id], onDelete: Restrict)
-  triggeredAt    DateTime @default(now()) @map("triggered_at") @db.DateTime(0)
+  id              String   @id @default(uuid()) @db.Char(36)
+  ticketId        String   @map("ticket_id") @db.Char(36)
+  ticket          Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  escalationLevel Int      @map("escalation_level")
+  slaType         SlaType  @map("sla_type")
+  notifiedUserId  String   @map("notified_user_id") @db.Char(36)
+  notifiedUser    User     @relation("EscalationNotifiedUser", fields: [notifiedUserId], references: [id], onDelete: Restrict)
+  triggeredAt     DateTime @default(now()) @map("triggered_at") @db.DateTime(0)
 
   @@map("escalation_events")
 }

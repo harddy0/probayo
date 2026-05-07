@@ -1,5 +1,11 @@
 // prisma/seed.ts
-import { PrismaClient, PriorityLevel, UserRole } from '@prisma/client';
+import {
+  PrismaClient,
+  PriorityLevel,
+  UserRole,
+  EscalationNotifyRole,
+  SlaType,
+} from '@prisma/client';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import 'dotenv/config';
 
@@ -191,6 +197,160 @@ async function main() {
     data: { headUserId: 'user_dept_head' },
   });
   console.log(`  🔗 Linked department head to IT Department`);
+
+  // ─── Escalation Rules ─────────────────────────────────────────────────────────
+  console.log('🚨 Seeding escalation rules...');
+
+  const escalationRules = [
+    // ── Critical ──────────────────────────────────────────────────────────────
+    // Ack SLA = 15 min → L1 notify IT staff-level (admin) at 50%, L2 at 100%
+    {
+      priorityLevel: PriorityLevel.Critical,
+      slaType: SlaType.Acknowledgement,
+      escalationLevel: 1,
+      triggerAfterMinutes: 8,
+      notifyRole: EscalationNotifyRole.Admin,
+    },
+    {
+      priorityLevel: PriorityLevel.Critical,
+      slaType: SlaType.Acknowledgement,
+      escalationLevel: 2,
+      triggerAfterMinutes: 15,
+      notifyRole: EscalationNotifyRole.DepartmentHead,
+    },
+    // Res SLA = 240 min → L1 at 50% (120), L2 at 75% (180), L3 at 100% (240)
+    {
+      priorityLevel: PriorityLevel.Critical,
+      slaType: SlaType.Resolution,
+      escalationLevel: 1,
+      triggerAfterMinutes: 120,
+      notifyRole: EscalationNotifyRole.Admin,
+    },
+    {
+      priorityLevel: PriorityLevel.Critical,
+      slaType: SlaType.Resolution,
+      escalationLevel: 2,
+      triggerAfterMinutes: 180,
+      notifyRole: EscalationNotifyRole.DepartmentHead,
+    },
+    {
+      priorityLevel: PriorityLevel.Critical,
+      slaType: SlaType.Resolution,
+      escalationLevel: 3,
+      triggerAfterMinutes: 240,
+      notifyRole: EscalationNotifyRole.DepartmentHead,
+    },
+
+    // ── High ──────────────────────────────────────────────────────────────────
+    // Ack SLA = 30 min
+    {
+      priorityLevel: PriorityLevel.High,
+      slaType: SlaType.Acknowledgement,
+      escalationLevel: 1,
+      triggerAfterMinutes: 15,
+      notifyRole: EscalationNotifyRole.Admin,
+    },
+    {
+      priorityLevel: PriorityLevel.High,
+      slaType: SlaType.Acknowledgement,
+      escalationLevel: 2,
+      triggerAfterMinutes: 30,
+      notifyRole: EscalationNotifyRole.DepartmentHead,
+    },
+    // Res SLA = 480 min
+    {
+      priorityLevel: PriorityLevel.High,
+      slaType: SlaType.Resolution,
+      escalationLevel: 1,
+      triggerAfterMinutes: 240,
+      notifyRole: EscalationNotifyRole.Admin,
+    },
+    {
+      priorityLevel: PriorityLevel.High,
+      slaType: SlaType.Resolution,
+      escalationLevel: 2,
+      triggerAfterMinutes: 360,
+      notifyRole: EscalationNotifyRole.DepartmentHead,
+    },
+    {
+      priorityLevel: PriorityLevel.High,
+      slaType: SlaType.Resolution,
+      escalationLevel: 3,
+      triggerAfterMinutes: 480,
+      notifyRole: EscalationNotifyRole.DepartmentHead,
+    },
+
+    // ── Medium ────────────────────────────────────────────────────────────────
+    // Ack SLA = 60 min
+    {
+      priorityLevel: PriorityLevel.Medium,
+      slaType: SlaType.Acknowledgement,
+      escalationLevel: 1,
+      triggerAfterMinutes: 30,
+      notifyRole: EscalationNotifyRole.Admin,
+    },
+    {
+      priorityLevel: PriorityLevel.Medium,
+      slaType: SlaType.Acknowledgement,
+      escalationLevel: 2,
+      triggerAfterMinutes: 60,
+      notifyRole: EscalationNotifyRole.DepartmentHead,
+    },
+    // Res SLA = 1440 min (24h)
+    {
+      priorityLevel: PriorityLevel.Medium,
+      slaType: SlaType.Resolution,
+      escalationLevel: 1,
+      triggerAfterMinutes: 720,
+      notifyRole: EscalationNotifyRole.Admin,
+    },
+    {
+      priorityLevel: PriorityLevel.Medium,
+      slaType: SlaType.Resolution,
+      escalationLevel: 2,
+      triggerAfterMinutes: 1080,
+      notifyRole: EscalationNotifyRole.DepartmentHead,
+    },
+
+    // ── Low ───────────────────────────────────────────────────────────────────
+    // Ack SLA = 240 min
+    {
+      priorityLevel: PriorityLevel.Low,
+      slaType: SlaType.Acknowledgement,
+      escalationLevel: 1,
+      triggerAfterMinutes: 120,
+      notifyRole: EscalationNotifyRole.Admin,
+    },
+    {
+      priorityLevel: PriorityLevel.Low,
+      slaType: SlaType.Acknowledgement,
+      escalationLevel: 2,
+      triggerAfterMinutes: 240,
+      notifyRole: EscalationNotifyRole.DepartmentHead,
+    },
+    // Res SLA = 2880 min (48h)
+    {
+      priorityLevel: PriorityLevel.Low,
+      slaType: SlaType.Resolution,
+      escalationLevel: 1,
+      triggerAfterMinutes: 1440,
+      notifyRole: EscalationNotifyRole.Admin,
+    },
+    {
+      priorityLevel: PriorityLevel.Low,
+      slaType: SlaType.Resolution,
+      escalationLevel: 2,
+      triggerAfterMinutes: 2880,
+      notifyRole: EscalationNotifyRole.DepartmentHead,
+    },
+  ];
+
+  for (const rule of escalationRules) {
+    await prisma.escalationRule.create({ data: rule });
+    console.log(
+      `  ✅ Escalation Rule: ${rule.priorityLevel} / ${rule.slaType} / L${rule.escalationLevel} → ${rule.notifyRole} at ${rule.triggerAfterMinutes}min`,
+    );
+  }
 
   console.log('🎉 Seeding complete!');
   console.log('');

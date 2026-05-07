@@ -1,11 +1,13 @@
 export const QUEUE_NAMES = {
   FILES: 'files',
+  MAIL: 'mail',
 } as const;
 
 export const JOB_NAMES = {
   PROCESS_FILE: 'process-file',
   UPLOAD_TICKET_ATTACHMENT: 'upload-ticket-attachment',
   UPLOAD_COMMENT_ATTACHMENT: 'upload-comment-attachment',
+  SEND_ESCALATION_EMAIL: 'send-escalation-email',
 } as const;
 
 export const RETRY_CONFIG = {
