@@ -206,6 +206,6 @@ export class SlaService {
   }
 
   formatDeadlineForDisplay(deadline: Date): string {
-    return deadline.toLocaleString();
+    return deadline.toISOString();
   }
 }
