@@ -18,10 +18,11 @@ import { TicketsModule } from './tickets/tickets.module';
 import { SlaModule } from './sla/sla.module';
 import { CommentsModule } from './comments/comments.module';
 import { AttachmentsModule } from './attachments/attachments.module';
+import { QueuesModule } from './queues/queues.module';
+import { MailModule } from './mail/mail.module';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { QueuesModule } from './queues/queues.module';
 
 @Module({
   imports: [
@@ -39,6 +40,9 @@ import { QueuesModule } from './queues/queues.module';
         REDIS_PORT: Joi.number().optional(),
         REDIS_USERNAME: Joi.string().optional(),
         REDIS_PASSWORD: Joi.string().optional(),
+        BREVO_API_KEY: Joi.string().required(),
+        EMAIL_FROM_ADDRESS: Joi.string().email().required(),
+        EMAIL_FROM_NAME: Joi.string().required(),
       }),
     }),
 
@@ -66,30 +70,25 @@ import { QueuesModule } from './queues/queues.module';
       })(),
     }),
 
-    BullModule.registerQueue({ name: 'files' }),
+    BullModule.registerQueue({ name: 'files' }, { name: 'mail' }),
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     ThrottlerModule.forRoot([
       {
-        ttl: 60000, // 1 minute window
-        limit: 10, // 10 requests per minute per IP
+        ttl: 60000,
+        limit: 10,
       },
     ]),
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     ScheduleModule.forRoot(),
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     BullBoardModule.forRoot({
       route: '/admin/queues',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       adapter: ExpressAdapter,
     }),
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    BullBoardModule.forFeature({
-      name: 'files',
-      adapter: BullMQAdapter,
-    }),
+    BullBoardModule.forFeature(
+      { name: 'files', adapter: BullMQAdapter },
+      { name: 'mail', adapter: BullMQAdapter },
+    ),
 
     PrismaModule,
     UsersModule,
@@ -101,6 +100,7 @@ import { QueuesModule } from './queues/queues.module';
     CommentsModule,
     AttachmentsModule,
     QueuesModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

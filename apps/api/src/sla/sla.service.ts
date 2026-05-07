@@ -19,10 +19,6 @@ export class SlaService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private toLocalWallClock(date: Date): Date {
-    return new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
-  }
-
   // ==================== CRUD Operations ====================
 
   async create(createSlaPolicyDto: CreateSlaPolicyDto) {
@@ -95,14 +91,13 @@ export class SlaService {
     startDate: Date = new Date(),
   ) {
     const policy = await this.getPolicy(priority);
-    const localStartDate = this.toLocalWallClock(startDate);
 
     return {
       ack: new Date(
-        localStartDate.getTime() + policy.acknowledgementMinutes * 60 * 1000,
+        startDate.getTime() + policy.acknowledgementMinutes * 60 * 1000,
       ),
       resolution: new Date(
-        localStartDate.getTime() + policy.resolutionMinutes * 60 * 1000,
+        startDate.getTime() + policy.resolutionMinutes * 60 * 1000,
       ),
     };
   }
@@ -200,7 +195,7 @@ export class SlaService {
   // ==================== Utility Methods ====================
 
   getTimeRemaining(deadline: Date): { minutes: number; isBreached: boolean } {
-    const now = this.toLocalWallClock(new Date());
+    const now = new Date(); // Using standard UTC Date
     const minutesRemaining = Math.floor(
       (deadline.getTime() - now.getTime()) / (60 * 1000),
     );
