@@ -24,8 +24,8 @@ enum PriorityLevel {
 enum TicketStatus {
   Open        @map("open")
   Acknowledged @map("acknowledged")
-  InProgress   @map("in_progress")
   PendingUser  @map("pending_user")
+  InProgress   @map("in_progress")
   Resolved     @map("resolved")
   Closed       @map("closed")
 }
@@ -52,6 +52,7 @@ enum NotificationType {
   KnownIssueResolved @map("known_issue_resolved")
   Assignment         @map("assignment")
   SlaBreach          @map("sla_breach")
+  CommentAdded       @map("comment_added")
 }
 
 enum NotificationChannel {
