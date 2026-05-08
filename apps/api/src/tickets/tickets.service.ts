@@ -12,6 +12,7 @@ import { CreateTicketCommentDto } from './dto/create-comment.dto';
 import { UpdateTicketCommentDto } from './dto/update-comment.dto';
 import { PriorityLevel, Prisma, TicketStatus, UserRole } from '@prisma/client';
 import { CommentsService } from '../comments/comments.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 type TicketActor = {
   id: string;
@@ -24,6 +25,7 @@ export class TicketsService {
   constructor(
     private prisma: PrismaService,
     private slaService: SlaService,
+    private notificationsService: NotificationsService,
   ) {}
 
   // ==================== CREATE TICKET ====================
@@ -102,6 +104,21 @@ export class TicketsService {
 
     // 7. Record status history
     await this.recordStatusHistory(ticket.id, null, TicketStatus.Open, userId);
+
+    // 8. Notify IT staff about new ticket (async, non-blocking)
+    const filedByName =
+      [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email;
+
+    const departmentName = user.department?.name || 'Unknown Department';
+
+    // Fire and forget - don't await to avoid blocking response
+    void this.notificationsService.notifyTicketCreated(
+      ticket.id,
+      ticket.title,
+      filedByName,
+      departmentName,
+      ticket.priority,
+    );
 
     return ticket;
   }
@@ -481,6 +498,29 @@ export class TicketsService {
         },
       },
     });
+
+    // Notify assignee about the assignment (async, non-blocking)
+    const assigneeName =
+      [assignedToUser.firstName, assignedToUser.lastName]
+        .filter(Boolean)
+        .join(' ') || assignedToUser.email;
+
+    const notificationsService = this.notificationsService as {
+      notifyTicketAssigned: (
+        ticketId: string,
+        ticketTitle: string,
+        assigneeId: string,
+        assigneeName: string,
+      ) => Promise<void>;
+    };
+
+    // Fire and forget - don't await to avoid blocking response
+    void notificationsService.notifyTicketAssigned(
+      ticket.id,
+      ticket.title,
+      assignedToUserId,
+      assigneeName,
+    );
 
     return updatedTicket;
   }

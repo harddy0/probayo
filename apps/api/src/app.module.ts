@@ -23,6 +23,7 @@ import { MailModule } from './mail/mail.module';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -70,7 +71,11 @@ import { AppService } from './app.service';
       })(),
     }),
 
-    BullModule.registerQueue({ name: 'files' }, { name: 'mail' }),
+    BullModule.registerQueue(
+      { name: 'files' },
+      { name: 'mail' },
+      { name: 'notifications' },
+    ),
 
     ThrottlerModule.forRoot([
       {
@@ -88,6 +93,7 @@ import { AppService } from './app.service';
     BullBoardModule.forFeature(
       { name: 'files', adapter: BullMQAdapter },
       { name: 'mail', adapter: BullMQAdapter },
+      { name: 'notifications', adapter: BullMQAdapter },
     ),
 
     PrismaModule,
@@ -101,6 +107,7 @@ import { AppService } from './app.service';
     AttachmentsModule,
     QueuesModule,
     MailModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
