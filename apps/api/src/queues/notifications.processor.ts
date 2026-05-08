@@ -6,6 +6,8 @@ import { JOB_NAMES, QUEUE_NAMES } from './constants/queue.constants';
 import {
   NotificationsService,
   TicketCreatedNotificationJobData,
+  StatusChangedNotificationJobData,
+  CommentAddedNotificationJobData,
 } from '../notifications/notifications.service';
 
 @Processor(QUEUE_NAMES.NOTIFICATIONS)
@@ -38,7 +40,7 @@ export class NotificationsProcessor extends WorkerHost {
       } else if (job.name === JOB_NAMES.SEND_TICKET_ASSIGNED_NOTIFICATION) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const data = job.data;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
         await this.notificationsService.createTicketAssignedNotifications(
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           data.ticketId as string,
@@ -48,6 +50,25 @@ export class NotificationsProcessor extends WorkerHost {
           data.assigneeId as string,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           data.assigneeName as string,
+        );
+      } else if (job.name === JOB_NAMES.SEND_STATUS_CHANGED_NOTIFICATION) {
+        const data = job.data as StatusChangedNotificationJobData;
+        await this.notificationsService.createStatusChangedNotifications(
+          data.ticketId,
+          data.ticketTitle,
+          data.creatorId,
+          data.creatorName,
+          data.oldStatus,
+          data.newStatus,
+        );
+      } else if (job.name === JOB_NAMES.SEND_COMMENT_ADDED_NOTIFICATION) {
+        const data = job.data as CommentAddedNotificationJobData;
+        await this.notificationsService.createCommentAddedNotifications(
+          data.ticketId,
+          data.ticketTitle,
+          data.commentAuthorId,
+          data.commentAuthorName,
+          data.commentBody,
         );
       }
 

@@ -26,6 +26,7 @@ export class TicketsService {
     private prisma: PrismaService,
     private slaService: SlaService,
     private notificationsService: NotificationsService,
+    private commentsService: CommentsService,
   ) {}
 
   // ==================== CREATE TICKET ====================
@@ -421,6 +422,35 @@ export class TicketsService {
     // 9. Record status history if changed
     if (statusChanged) {
       await this.recordStatusHistory(id, oldStatus, newStatus!, userId);
+
+      // Notify creator about status change (async, non-blocking)
+      const creatorName =
+        [
+          existingTicket.filedByUser.firstName,
+          existingTicket.filedByUser.lastName,
+        ]
+          .filter(Boolean)
+          .join(' ') || existingTicket.filedByUser.email;
+
+      const notificationsService = this.notificationsService as {
+        notifyStatusChanged: (
+          ticketId: string,
+          ticketTitle: string,
+          creatorId: string,
+          creatorName: string,
+          oldStatus: string,
+          newStatus: string,
+        ) => Promise<void>;
+      };
+
+      void notificationsService.notifyStatusChanged(
+        id,
+        existingTicket.title,
+        existingTicket.filedByUserId,
+        creatorName,
+        oldStatus,
+        newStatus!,
+      );
     }
 
     // 10. Check for SLA breaches after update
@@ -550,8 +580,7 @@ export class TicketsService {
     userId: string,
     createCommentDto: CreateTicketCommentDto,
   ) {
-    const commentsService = new CommentsService(this.prisma);
-    return commentsService.create(userId, {
+    return this.commentsService.create(userId, {
       ticketId,
       body: createCommentDto.body,
       isInternal: createCommentDto.isInternal,
@@ -559,8 +588,7 @@ export class TicketsService {
   }
 
   async getComments(ticketId: string, userId: string) {
-    const commentsService = new CommentsService(this.prisma);
-    return commentsService.findAll(ticketId, userId);
+    return this.commentsService.findAll(ticketId, userId);
   }
 
   async updateComment(
@@ -568,13 +596,11 @@ export class TicketsService {
     userId: string,
     updateCommentDto: UpdateTicketCommentDto,
   ) {
-    const commentsService = new CommentsService(this.prisma);
-    return commentsService.update(commentId, userId, updateCommentDto);
+    return this.commentsService.update(commentId, userId, updateCommentDto);
   }
 
   async deleteComment(commentId: string, userId: string) {
-    const commentsService = new CommentsService(this.prisma);
-    return commentsService.remove(commentId, userId);
+    return this.commentsService.remove(commentId, userId);
   }
 
   // ==================== HELPER METHODS ====================
@@ -602,13 +628,8 @@ export class TicketsService {
     const allowedTransitions: Record<TicketStatus, TicketStatus[]> = {
       [TicketStatus.Open]: [TicketStatus.Acknowledged, TicketStatus.Closed],
       [TicketStatus.Acknowledged]: [
+        TicketStatus.PendingUser,
         TicketStatus.InProgress,
-        TicketStatus.PendingUser,
-        TicketStatus.Resolved,
-        TicketStatus.Closed,
-      ],
-      [TicketStatus.InProgress]: [
-        TicketStatus.PendingUser,
         TicketStatus.Resolved,
         TicketStatus.Closed,
       ],
@@ -617,6 +638,7 @@ export class TicketsService {
         TicketStatus.Resolved,
         TicketStatus.Closed,
       ],
+      [TicketStatus.InProgress]: [TicketStatus.Resolved, TicketStatus.Closed],
       [TicketStatus.Resolved]: [TicketStatus.Closed, TicketStatus.Open],
       [TicketStatus.Closed]: [],
     };

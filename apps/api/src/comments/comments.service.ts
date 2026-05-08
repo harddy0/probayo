@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { UserRole } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 
 type CommentUser = {
   id: string;
@@ -21,7 +22,10 @@ type CommentTicket = {
 
 @Injectable()
 export class CommentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async create(userId: string, createCommentDto: CreateCommentDto) {
     // Verify ticket exists
@@ -52,7 +56,7 @@ export class CommentsService {
     }
 
     // Create comment
-    return this.prisma.ticketComment.create({
+    const comment = await this.prisma.ticketComment.create({
       data: {
         ticketId: createCommentDto.ticketId,
         authorUserId: userId,
@@ -71,6 +75,21 @@ export class CommentsService {
         attachments: true,
       },
     });
+
+    // Notify participants about the new comment
+    if (!comment.isInternal) {
+      const authorName =
+        `${comment.authorUser.firstName || ''} ${comment.authorUser.lastName || ''}`.trim();
+      void this.notificationsService.notifyCommentAdded(
+        ticket.id,
+        ticket.title,
+        userId,
+        authorName,
+        comment.body,
+      );
+    }
+
+    return comment;
   }
 
   async findAll(ticketId: string, userId: string) {
