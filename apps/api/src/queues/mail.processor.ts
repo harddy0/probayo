@@ -9,6 +9,9 @@ import { QUEUE_NAMES, JOB_NAMES } from './constants/queue.constants';
 interface EscalationJobData {
   ticketId: string;
   breachType: 'acknowledgement' | 'resolution';
+  notifyEmail?: string;
+  notifyName?: string;
+  ruleLevel?: number;
 }
 
 interface BreachNotificationJobData {
@@ -83,25 +86,38 @@ export class MailProcessor extends WorkerHost {
       include: { department: { include: { headUser: true } } },
     });
 
-    if (!ticket || !ticket.department?.headUser) {
+    if (!ticket) {
       this.logger.warn(
-        `Cannot send escalation: Ticket ${data.ticketId} missing or has no department head.`,
+        `Cannot send escalation: Ticket ${data.ticketId} missing.`,
       );
       return;
     }
 
-    const headEmail = ticket.department.headUser.email;
+    const recipientEmail =
+      data.notifyEmail ?? ticket.department?.headUser?.email;
+
+    if (!recipientEmail) {
+      this.logger.warn(
+        `Cannot send escalation: no recipient email in job payload and no department head for ticket ${data.ticketId}.`,
+      );
+      return;
+    }
+
+    const recipientName =
+      data.notifyName ?? ticket.department?.headUser?.firstName;
     const shortId = ticket.id.split('-')[0];
     const subject = `🚨 URGENT SLA BREACH: Ticket #${shortId}`;
 
     const htmlContent = `
       <h2>SLA Breach Notification</h2>
+      <p>Hi ${recipientName ?? 'IT Lead'},</p>
       <p><strong>Ticket:</strong> ${ticket.title}</p>
       <p><strong>Priority:</strong> <span style="color:red; text-transform:uppercase;">${ticket.priority}</span></p>
       <p><strong>Breach Type:</strong> ${data.breachType}</p>
+      <p><strong>Escalation Level:</strong> ${data.ruleLevel ?? 'N/A'}</p>
       <p>Please review immediately.</p>
     `;
 
-    await this.mailService.sendEmail(headEmail, subject, htmlContent);
+    await this.mailService.sendEmail(recipientEmail, subject, htmlContent);
   }
 }
