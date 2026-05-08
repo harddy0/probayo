@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -34,8 +36,16 @@ export class SlaCronService {
     try {
       const now = new Date();
 
+      // Fetch fallback IT users once in case we have unassigned breached tickets
+      const fallbackItUsers = await this.prisma.user.findMany({
+        where: {
+          role: { in: [UserRole.ItStaff, UserRole.Admin] },
+          isActive: true,
+        },
+      });
+
       // ==========================================
-      // PHASE 1: MARK BREACHES
+      // PHASE 1: MARK BREACHES & NOTIFY IT STAFF
       // ==========================================
       const unbreachedTickets = await this.prisma.ticket.findMany({
         where: {
@@ -59,6 +69,9 @@ export class SlaCronService {
             },
           ],
         },
+        include: {
+          assignedToUser: true, // Need this to know who to email
+        },
       });
 
       for (const ticket of unbreachedTickets) {
@@ -66,6 +79,8 @@ export class SlaCronService {
           slaAckBreached?: boolean;
           slaResolutionBreached?: boolean;
         } = {};
+        let newlyBreachedAck = false;
+        let newlyBreachedRes = false;
 
         if (
           !ticket.acknowledgedAt &&
@@ -73,6 +88,7 @@ export class SlaCronService {
           now > ticket.slaAckDeadline
         ) {
           updates.slaAckBreached = true;
+          newlyBreachedAck = true;
         }
 
         if (
@@ -81,6 +97,7 @@ export class SlaCronService {
           now > ticket.slaResolutionDeadline
         ) {
           updates.slaResolutionBreached = true;
+          newlyBreachedRes = true;
         }
 
         if (Object.keys(updates).length > 0) {
@@ -88,8 +105,29 @@ export class SlaCronService {
             where: { id: ticket.id },
             data: updates,
           });
+
+          // Queue Immediate Notification Emails
+          if (newlyBreachedAck) {
+            await this.queueBreachEmails(
+              ticket,
+              SlaType.Acknowledgement,
+              fallbackItUsers,
+            );
+          }
+          if (newlyBreachedRes) {
+            await this.queueBreachEmails(
+              ticket,
+              SlaType.Resolution,
+              fallbackItUsers,
+            );
+          }
         }
       }
+
+      // ==========================================
+      // PHASE 2: PROCESS ESCALATIONS
+      // ==========================================
+      // ... (Keep existing Phase 2 logic exactly as it is) ...
 
       // ==========================================
       // PHASE 2: PROCESS ESCALATIONS
@@ -169,14 +207,12 @@ export class SlaCronService {
   ) {
     // Find rules that apply to this ticket's priority and this specific SLA type
     const rules = allRules.filter(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       (r) => r.priorityLevel === ticket.priority && r.slaType === slaType,
     );
 
     for (const rule of rules) {
       // Calculate exactly when this escalation should fire based on the DB rule
       const triggerTime = new Date(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         deadline.getTime() + rule.triggerAfterMinutes * 60000,
       );
 
@@ -184,28 +220,21 @@ export class SlaCronService {
         let recipients: any[] = [];
 
         // Dynamically assign recipients based on the rule
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         if (rule.notifyRole === EscalationNotifyRole.Admin) {
           recipients = admins;
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         } else if (rule.notifyRole === EscalationNotifyRole.DepartmentHead) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           if (ticket.department?.headUser) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             recipients = [ticket.department.headUser];
           }
         }
 
         for (const recipient of recipients) {
           // Check the database events: Did we already send this SLA Type at this level to this user?
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
           const alreadyNotified = ticket.escalations.some(
             (e: any) =>
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
               e.escalationLevel === rule.escalationLevel &&
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
               e.slaType === slaType &&
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
               e.notifiedUserId === recipient.id,
           );
 
@@ -213,32 +242,30 @@ export class SlaCronService {
             // 1. Record event cleanly in the DB so it never repeats
             const event = await this.prisma.escalationEvent.create({
               data: {
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
                 ticketId: ticket.id,
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+
                 escalationLevel: rule.escalationLevel,
                 slaType: slaType, // Using the new DB column
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+
                 notifiedUserId: recipient.id,
               },
             });
 
             // Push to local array to prevent duplicate triggers in the same execution cycle
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
             ticket.escalations.push(event);
 
             // 2. Queue Email payload with dynamic recipient details
             await this.mailQueue.add(
               JOB_NAMES.SEND_ESCALATION_EMAIL,
               {
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
                 ticketId: ticket.id,
                 breachType: slaType,
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+
                 notifyEmail: recipient.email,
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+
                 notifyName: recipient.firstName || 'IT Lead',
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+
                 ruleLevel: rule.escalationLevel,
               },
               {
@@ -251,12 +278,47 @@ export class SlaCronService {
             );
 
             this.logger.log(
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
               `Escalation L${rule.escalationLevel} (${slaType}) queued for Ticket ${ticket.id} -> ${recipient.email}`,
             );
           }
         }
       }
     }
+  }
+  private async queueBreachEmails(
+    ticket: any,
+    breachType: SlaType,
+    fallbackUsers: any[],
+  ) {
+    // If ticket is assigned, email the assignee. Otherwise, email all IT/Admins.
+    const recipients = ticket.assignedToUser
+      ? [ticket.assignedToUser]
+      : fallbackUsers;
+
+    for (const recipient of recipients) {
+      await this.mailQueue.add(
+        JOB_NAMES.SEND_BREACH_NOTIFICATION_EMAIL,
+        {
+          ticketId: ticket.id,
+          ticketTitle: ticket.title,
+          ticketPriority: ticket.priority,
+          breachType: breachType,
+
+          notifyEmail: recipient.email,
+          notifyName: recipient.firstName || 'IT Staff',
+        },
+        {
+          attempts: RETRY_CONFIG.ATTEMPTS,
+          backoff: {
+            type: RETRY_CONFIG.BACKOFF_TYPE,
+            delay: RETRY_CONFIG.BACKOFF_DELAY,
+          },
+        },
+      );
+    }
+
+    this.logger.log(
+      `Breach Notification (${breachType}) queued for Ticket ${ticket.id} -> ${recipients.length} recipients`,
+    );
   }
 }

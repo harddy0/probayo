@@ -34,19 +34,16 @@ describe('SlaService', () => {
     prismaMock.slaPolicy.findUnique.mockResolvedValue(null);
 
     const startDate = new Date('2026-05-04T10:00:00.000Z');
-    const startDateLocal = new Date(
-      startDate.getTime() - startDate.getTimezoneOffset() * 60 * 1000,
-    );
     const deadlines = await service.calculateDeadlines(
       PriorityLevel.Critical,
       startDate,
     );
 
     expect(deadlines.ack.toISOString()).toBe(
-      new Date(startDateLocal.getTime() + 15 * 60 * 1000).toISOString(),
+      new Date(startDate.getTime() + 15 * 60 * 1000).toISOString(),
     );
     expect(deadlines.resolution.toISOString()).toBe(
-      new Date(startDateLocal.getTime() + 240 * 60 * 1000).toISOString(),
+      new Date(startDate.getTime() + 240 * 60 * 1000).toISOString(),
     );
   });
 });

@@ -8,6 +8,7 @@ export const JOB_NAMES = {
   UPLOAD_TICKET_ATTACHMENT: 'upload-ticket-attachment',
   UPLOAD_COMMENT_ATTACHMENT: 'upload-comment-attachment',
   SEND_ESCALATION_EMAIL: 'send-escalation-email',
+  SEND_BREACH_NOTIFICATION_EMAIL: 'send-breach-notification-email',
 } as const;
 
 export const RETRY_CONFIG = {
