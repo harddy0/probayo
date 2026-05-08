@@ -40,7 +40,7 @@ import { AppService } from './app.service';
         REDIS_PORT: Joi.number().optional(),
         REDIS_USERNAME: Joi.string().optional(),
         REDIS_PASSWORD: Joi.string().optional(),
-        BREVO_API_KEY: Joi.string().required(),
+        RESEND_API_KEY: Joi.string().required(),
         EMAIL_FROM_ADDRESS: Joi.string().email().required(),
         EMAIL_FROM_NAME: Joi.string().required(),
       }),
