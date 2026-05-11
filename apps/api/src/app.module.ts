@@ -24,6 +24,7 @@ import { QUEUE_NAMES } from './queues/constants/queue.constants';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { NotificationsModule } from './notifications/notifications.module';
+import { KnownIssuesModule } from './known-issues/known-issues.module';
 
 @Module({
   imports: [
@@ -103,6 +104,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     QueuesModule,
     MailModule,
     NotificationsModule,
+    KnownIssuesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

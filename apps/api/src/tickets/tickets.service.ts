@@ -10,7 +10,13 @@ import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { CreateTicketCommentDto } from './dto/create-comment.dto';
 import { UpdateTicketCommentDto } from './dto/update-comment.dto';
-import { PriorityLevel, Prisma, TicketStatus, UserRole } from '@prisma/client';
+import {
+  KnownIssueStatus,
+  PriorityLevel,
+  Prisma,
+  TicketStatus,
+  UserRole,
+} from '@prisma/client';
 import { CommentsService } from '../comments/comments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -83,6 +89,7 @@ export class TicketsService {
         description: createTicketDto.description,
         categoryId: createTicketDto.categoryId,
         assetId: createTicketDto.assetId,
+        knownIssueId: createTicketDto.knownIssueId,
         priority: priority,
         status: TicketStatus.Open,
         filedByUserId: userId,
@@ -568,6 +575,26 @@ export class TicketsService {
     return this.prisma.ticket.update({
       where: { id },
       data: { assignedToUserId: null },
+    });
+  }
+
+  // ==================== BULK ATTACH TO KNOWN ISSUE ====================
+  async bulkAttachToKnownIssue(ticketIds: string[], knownIssueId: string) {
+    const knownIssue = await this.prisma.knownIssue.findFirst({
+      where: {
+        id: knownIssueId,
+        status: KnownIssueStatus.Active,
+        deletedAt: null,
+      },
+    });
+
+    if (!knownIssue) {
+      throw new BadRequestException('Known issue not found or not active');
+    }
+
+    return this.prisma.ticket.updateMany({
+      where: { id: { in: ticketIds } },
+      data: { knownIssueId },
     });
   }
 

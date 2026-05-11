@@ -54,4 +54,13 @@ export class CreateTicketDto {
   @IsEnum(PriorityLevel)
   @IsOptional()
   priority?: PriorityLevel;
+
+  @ApiPropertyOptional({
+    description: 'Known issue ID if this ticket is related to a known problem',
+    example: '123e4567-e89b-12d3-a456-426614174003',
+    nullable: true,
+  })
+  @IsUUID()
+  @IsOptional()
+  knownIssueId?: string | null;
 }

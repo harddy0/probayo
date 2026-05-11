@@ -52,6 +52,12 @@ export interface CommentAddedNotificationJobData {
   commentBody: string;
 }
 
+export interface KnownIssueResolvedNotificationJobData {
+  knownIssueId: string;
+  title: string;
+  description: string;
+}
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
@@ -562,6 +568,93 @@ export class NotificationsService {
         error instanceof Error ? error.message : String(error),
       );
       // Don't throw - notification failure shouldn't block comment creation
+    }
+  }
+
+  async createKnownIssueResolvedNotifications(
+    knownIssueId: string,
+    title: string,
+    description: string,
+  ): Promise<void> {
+    try {
+      const tickets = await this.prisma.ticket.findMany({
+        where: { knownIssueId },
+        select: { id: true, filedByUserId: true },
+      });
+
+      if (tickets.length === 0) {
+        this.logger.warn(
+          `No tickets found for known issue resolved notification ${knownIssueId}`,
+        );
+        return;
+      }
+
+      const subject = `Known Issue Resolved: ${title.substring(0, 50)}`;
+      const body =
+        `The global system issue affecting your ticket (${title}) has been marked as RESOLVED. ` +
+        'Please verify if your issue persists.' +
+        (description ? `\n\nIssue details: ${description}` : '');
+
+      await Promise.all(
+        tickets.map((ticket) =>
+          this.create({
+            recipientUserId: ticket.filedByUserId,
+            ticketId: ticket.id,
+            type: NotificationType.KnownIssueResolved,
+            channel: NotificationChannel.InApp,
+            subject,
+            body,
+          }),
+        ),
+      );
+
+      this.logger.log(
+        `Known issue resolved notifications created for issue ${knownIssueId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to create known issue resolved notifications for issue ${knownIssueId}:`,
+        error instanceof Error ? error.message : String(error),
+      );
+      // Don't throw - notification failure shouldn't block known issue updates
+    }
+  }
+
+  async notifyKnownIssueResolved(
+    knownIssueId: string,
+    title: string,
+    description: string,
+  ): Promise<void> {
+    try {
+      const payload: KnownIssueResolvedNotificationJobData = {
+        knownIssueId,
+        title,
+        description,
+      };
+
+      await this.notificationsQueue.add(
+        JOB_NAMES.SEND_KNOWN_ISSUE_RESOLVED_NOTIFICATION,
+        payload,
+        {
+          attempts: RETRY_CONFIG.ATTEMPTS,
+          backoff: {
+            type: RETRY_CONFIG.BACKOFF_TYPE,
+            delay: RETRY_CONFIG.BACKOFF_DELAY,
+          },
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      );
+
+      this.logger.log(
+        `Queued known issue resolved notifications for issue ${knownIssueId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to queue known issue resolved notifications for issue ${knownIssueId}:`,
+        error instanceof Error ? error.message : String(error),
+      );
+      // Don't throw - notification failure shouldn't block known issue updates
     }
   }
 }
