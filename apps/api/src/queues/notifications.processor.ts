@@ -8,6 +8,7 @@ import {
   TicketCreatedNotificationJobData,
   StatusChangedNotificationJobData,
   CommentAddedNotificationJobData,
+  KnownIssueResolvedNotificationJobData,
 } from '../notifications/notifications.service';
 
 @Processor(QUEUE_NAMES.NOTIFICATIONS)
@@ -69,6 +70,15 @@ export class NotificationsProcessor extends WorkerHost {
           data.commentAuthorId,
           data.commentAuthorName,
           data.commentBody,
+        );
+      } else if (
+        job.name === JOB_NAMES.SEND_KNOWN_ISSUE_RESOLVED_NOTIFICATION
+      ) {
+        const data = job.data as KnownIssueResolvedNotificationJobData;
+        await this.notificationsService.createKnownIssueResolvedNotifications(
+          data.knownIssueId,
+          data.title,
+          data.description,
         );
       }
 

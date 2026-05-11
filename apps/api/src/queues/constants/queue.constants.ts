@@ -14,6 +14,8 @@ export const JOB_NAMES = {
   SEND_TICKET_ASSIGNED_NOTIFICATION: 'send-ticket-assigned-notification',
   SEND_STATUS_CHANGED_NOTIFICATION: 'send-status-changed-notification',
   SEND_COMMENT_ADDED_NOTIFICATION: 'send-comment-added-notification',
+  SEND_KNOWN_ISSUE_RESOLVED_NOTIFICATION:
+    'send-known-issue-resolved-notification',
 } as const;
 
 export const RETRY_CONFIG = {

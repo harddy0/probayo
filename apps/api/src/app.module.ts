@@ -5,7 +5,6 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { ExpressAdapter } from '@bull-board/express';
-import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import * as Joi from 'joi';
 import { join } from 'path';
 
@@ -20,10 +19,12 @@ import { CommentsModule } from './comments/comments.module';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { QueuesModule } from './queues/queues.module';
 import { MailModule } from './mail/mail.module';
+import { QUEUE_NAMES } from './queues/constants/queue.constants';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { NotificationsModule } from './notifications/notifications.module';
+import { KnownIssuesModule } from './known-issues/known-issues.module';
 
 @Module({
   imports: [
@@ -72,9 +73,9 @@ import { NotificationsModule } from './notifications/notifications.module';
     }),
 
     BullModule.registerQueue(
-      { name: 'files' },
-      { name: 'mail' },
-      { name: 'notifications' },
+      { name: QUEUE_NAMES.FILES },
+      { name: QUEUE_NAMES.MAIL },
+      { name: QUEUE_NAMES.NOTIFICATIONS },
     ),
 
     ThrottlerModule.forRoot([
@@ -90,11 +91,6 @@ import { NotificationsModule } from './notifications/notifications.module';
       route: '/admin/queues',
       adapter: ExpressAdapter,
     }),
-    BullBoardModule.forFeature(
-      { name: 'files', adapter: BullMQAdapter },
-      { name: 'mail', adapter: BullMQAdapter },
-      { name: 'notifications', adapter: BullMQAdapter },
-    ),
 
     PrismaModule,
     UsersModule,
@@ -108,6 +104,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     QueuesModule,
     MailModule,
     NotificationsModule,
+    KnownIssuesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

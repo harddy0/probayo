@@ -29,6 +29,7 @@ import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { TicketResponseDto } from './dto/ticket-response.dto';
 import { CreateTicketCommentDto } from './dto/create-comment.dto';
 import { UpdateTicketCommentDto } from './dto/update-comment.dto';
+import { BulkAttachIssueDto } from './dto/bulk-attach-issue.dto';
 
 @ApiTags('tickets')
 @ApiBearerAuth()
@@ -132,6 +133,19 @@ export class TicketsController {
   @ApiResponse({ status: 403, description: 'Forbidden - Admin/IT only' })
   remove(@Param('id') id: string, @Request() req: { user: { id: string } }) {
     return this.ticketsService.remove(id, req.user.id);
+  }
+
+  @Post('bulk-attach-issue')
+  @Roles(UserRole.Admin, UserRole.ItStaff)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Bulk attach tickets to a known issue' })
+  @ApiBody({ type: BulkAttachIssueDto })
+  @ApiResponse({ status: 200, description: 'Tickets attached successfully' })
+  bulkAttachIssue(@Body() bulkAttachIssueDto: BulkAttachIssueDto) {
+    return this.ticketsService.bulkAttachToKnownIssue(
+      bulkAttachIssueDto.ticketIds,
+      bulkAttachIssueDto.knownIssueId,
+    );
   }
 
   @Post(':id/assign/:userId')

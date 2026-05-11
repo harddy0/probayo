@@ -56,11 +56,9 @@ export class HealthController {
   @Roles(UserRole.Admin)
   @ApiOperation({ summary: 'Get failed jobs count' })
   async getFailedJobsCount() {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const count = await this.prisma.failedJob.count({
       where: { resolved_at: null },
     });
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     return { failedJobsCount: count, hasFailures: count > 0 };
   }
 }
