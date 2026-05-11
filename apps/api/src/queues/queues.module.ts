@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
+import { BullBoardModule } from '@bull-board/nestjs';
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AttachmentsModule } from '../attachments/attachments.module';
 import { MailModule } from '../mail/mail.module';
@@ -23,6 +25,11 @@ import { QUEUE_NAMES } from './constants/queue.constants';
       { name: QUEUE_NAMES.FILES },
       { name: QUEUE_NAMES.MAIL },
       { name: QUEUE_NAMES.NOTIFICATIONS },
+    ),
+    BullBoardModule.forFeature(
+      { name: QUEUE_NAMES.FILES, adapter: BullMQAdapter },
+      { name: QUEUE_NAMES.MAIL, adapter: BullMQAdapter },
+      { name: QUEUE_NAMES.NOTIFICATIONS, adapter: BullMQAdapter },
     ),
   ],
   controllers: [FailedJobsController, HealthController],
