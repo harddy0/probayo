@@ -2,15 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { fetchProfile } from "@/lib/api/auth";
-import { Mail, User, Shield, Calendar, Loader } from "lucide-react";
+import { Mail, User, Shield, Calendar, Loader, Pencil } from "lucide-react";
 import type { UserProfile } from "@/lib/types/auth";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import EditProfileModal from "@/components/profile/edit-profile-modal";
 
 export default function ItStaffProfile() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -64,9 +72,13 @@ export default function ItStaffProfile() {
               <div className="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                   <CardTitle>
-                    {profile.firstName && profile.lastName ? `${profile.firstName} ${profile.lastName}` : "IT Staff Member"}
+                    {profile.firstName && profile.lastName
+                      ? `${profile.firstName} ${profile.lastName}`
+                      : "IT Staff Member"}
                   </CardTitle>
-                  <CardDescription className="mt-1">{profile.email}</CardDescription>
+                  <CardDescription className="mt-1">
+                    {profile.email}
+                  </CardDescription>
                 </div>
                 <div className="rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 p-1">
                   <div className="rounded-full bg-zinc-950 p-4">
@@ -108,7 +120,9 @@ export default function ItStaffProfile() {
                   <User className="h-5 w-5 flex-shrink-0 text-green-400" />
                   <div>
                     <p className="text-sm text-zinc-400">User ID</p>
-                    <p className="mt-1 font-medium font-mono text-xs">{profile.id}</p>
+                    <p className="mt-1 font-medium font-mono text-xs">
+                      {profile.id}
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -128,11 +142,26 @@ export default function ItStaffProfile() {
           </div>
 
           <div className="mt-8 flex gap-4">
-            <Button className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700">Edit Profile</Button>
-            <Button className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700">Change Password</Button>
+            <Button
+              className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700"
+              onClick={() => setIsEditing(true)}
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit Profile
+            </Button>
+            <Button className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700">
+              Change Password
+            </Button>
           </div>
         </>
       )}
+
+      <EditProfileModal
+        open={isEditing}
+        profile={profile}
+        onClose={() => setIsEditing(false)}
+        onUpdated={(updated) => setProfile(updated)}
+      />
     </div>
   );
 }

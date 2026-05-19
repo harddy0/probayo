@@ -1,9 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Edit, Building2, Users, X, Loader, AlertCircle } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Edit,
+  Building2,
+  Users,
+  X,
+  Loader,
+  AlertCircle,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import UserSelect from "@/components/ui/user-select";
 import {
   fetchAllDepartments,
   createDepartment,
@@ -25,7 +35,10 @@ export default function DepartmentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [modal, setModal] = useState<ModalState>({ type: null, department: null });
+  const [modal, setModal] = useState<ModalState>({
+    type: null,
+    department: null,
+  });
   const [formData, setFormData] = useState({ name: "", headUserId: "" });
 
   // Load departments on mount
@@ -40,7 +53,9 @@ export default function DepartmentsPage() {
       const data = await fetchAllDepartments();
       setDepartments(data);
     } catch (err) {
-      const message = isApiError(err) ? err.message : "Failed to load departments";
+      const message = isApiError(err)
+        ? err.message
+        : "Failed to load departments";
       setError(message);
     } finally {
       setIsLoading(false);
@@ -64,7 +79,7 @@ export default function DepartmentsPage() {
           headUserId: formData.headUserId || null,
         });
         setDepartments((prev) =>
-          prev.map((d) => (d.id === modal.department!.id ? updated : d))
+          prev.map((d) => (d.id === modal.department!.id ? updated : d)),
         );
       } else {
         // Create new
@@ -175,7 +190,9 @@ export default function DepartmentsPage() {
               <Building2 className="h-8 w-8 text-zinc-600" />
             </div>
           </div>
-          <p className="mb-2 text-sm font-medium text-zinc-300">No departments yet</p>
+          <p className="mb-2 text-sm font-medium text-zinc-300">
+            No departments yet
+          </p>
           <p className="mb-6 text-xs text-zinc-500">
             Create your first department to get started.
           </p>
@@ -201,7 +218,9 @@ export default function DepartmentsPage() {
                     <Building2 className="h-5 w-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-white truncate text-base">{dept.name}</h3>
+                    <h3 className="font-semibold text-white truncate text-base">
+                      {dept.name}
+                    </h3>
                     {dept.headUser && (
                       <p className="text-xs text-zinc-500 truncate mt-1">
                         Head: {dept.headUser.firstName} {dept.headUser.lastName}
@@ -224,6 +243,7 @@ export default function DepartmentsPage() {
                   >
                     <Edit className="h-4 w-4" />
                   </button>
+                  {/* head unassign removed per constraints */}
                   <button
                     onClick={() => handleDelete(dept.id)}
                     disabled={isSubmitting}
@@ -276,26 +296,29 @@ export default function DepartmentsPage() {
               )}
 
               <div className="space-y-2">
-                <Label className="text-sm font-medium text-zinc-300">Department Name</Label>
+                <Label className="text-sm font-medium text-zinc-300">
+                  Department Name
+                </Label>
                 <Input
                   placeholder="Engineering, Sales, Operations..."
                   value={formData.name}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, name: e.target.value }))
+                  }
                   disabled={isSubmitting}
                   className="rounded-lg border-zinc-700 bg-zinc-800/50 text-white placeholder-zinc-600 focus:border-white/20 focus:ring-white/10"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm font-medium text-zinc-300">Head User ID (Optional)</Label>
-                <Input
-                  placeholder="UUID of department head"
+                <UserSelect
+                  label="Head user"
                   value={formData.headUserId}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, headUserId: e.target.value }))
+                  onChange={(id) =>
+                    setFormData((prev) => ({ ...prev, headUserId: id }))
                   }
+                  placeholder="Search users by name or email"
                   disabled={isSubmitting}
-                  className="rounded-lg border-zinc-700 bg-zinc-800/50 text-white placeholder-zinc-600 focus:border-white/20 focus:ring-white/10"
                 />
               </div>
             </div>
@@ -306,7 +329,9 @@ export default function DepartmentsPage() {
                 disabled={isSubmitting || !formData.name.trim()}
                 className="flex-1 rounded-lg bg-white py-2.5 font-semibold text-zinc-950 transition hover:bg-zinc-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting && <Loader className="mr-2 h-4 w-4 animate-spin inline" />}
+                {isSubmitting && (
+                  <Loader className="mr-2 h-4 w-4 animate-spin inline" />
+                )}
                 {modal.type === "edit" ? "Update" : "Create"}
               </button>
               <button
@@ -327,7 +352,9 @@ export default function DepartmentsPage() {
           <div className="w-full max-w-2xl rounded-2xl border border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-2xl">
             <div className="flex items-center justify-between border-b border-zinc-800/50 px-6 py-5">
               <div>
-                <h2 className="text-lg font-semibold text-white">{modal.department.name}</h2>
+                <h2 className="text-lg font-semibold text-white">
+                  {modal.department.name}
+                </h2>
                 <p className="text-xs text-zinc-500 mt-1">Team members</p>
               </div>
               <button
@@ -344,10 +371,13 @@ export default function DepartmentsPage() {
                   <Loader className="h-5 w-5 animate-spin text-zinc-500" />
                   <p className="text-sm text-zinc-500">Loading members...</p>
                 </div>
-              ) : !modal.department.members || modal.department.members.length === 0 ? (
+              ) : !modal.department.members ||
+                modal.department.members.length === 0 ? (
                 <div className="rounded-lg border border-zinc-800 bg-zinc-800/20 py-8 text-center">
                   <Users className="mx-auto mb-3 h-8 w-8 text-zinc-600" />
-                  <p className="text-sm text-zinc-500">No members assigned yet.</p>
+                  <p className="text-sm text-zinc-500">
+                    No members assigned yet.
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -360,7 +390,9 @@ export default function DepartmentsPage() {
                         <p className="text-sm font-medium text-white truncate">
                           {member.firstName} {member.lastName}
                         </p>
-                        <p className="text-xs text-zinc-500 truncate">{member.email}</p>
+                        <p className="text-xs text-zinc-500 truncate">
+                          {member.email}
+                        </p>
                       </div>
                       <div className="ml-4 flex items-center gap-3 flex-shrink-0">
                         <span className="rounded-md bg-zinc-700 px-2.5 py-1 text-xs font-medium text-zinc-200">
@@ -380,6 +412,8 @@ export default function DepartmentsPage() {
           </div>
         </div>
       )}
+
+      {/* Unassign functionality removed (constraint) */}
     </section>
   );
 }

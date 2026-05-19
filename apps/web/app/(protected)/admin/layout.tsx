@@ -10,6 +10,7 @@ import {
   LogOut,
   Building2,
   HardDrive,
+  UserRound,
 } from "lucide-react";
 import { logout } from "@/lib/api/auth";
 import { getAuthSession } from "@/lib/api/client";
@@ -33,7 +34,10 @@ export default function AdminLayout({
     }
 
     // Normalize role to be resilient to casing/spacing and punctuation differences.
-    const role = String(session.identity.role || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    const role = String(session.identity.role || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
     if (role === "admin") {
       setIsAuthorized(true);
     } else {
@@ -102,7 +106,12 @@ export default function AdminLayout({
               )}
             >
               <LayoutDashboard className="h-5 w-5 shrink-0" />
-              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>
+              <span
+                className={cn(
+                  "transition-all duration-300",
+                  isCollapsed && "w-0 overflow-hidden",
+                )}
+              >
                 Dashboard
               </span>
             </Link>
@@ -117,7 +126,12 @@ export default function AdminLayout({
               )}
             >
               <Building2 className="h-5 w-5 shrink-0" />
-              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>
+              <span
+                className={cn(
+                  "transition-all duration-300",
+                  isCollapsed && "w-0 overflow-hidden",
+                )}
+              >
                 Departments
               </span>
             </Link>
@@ -132,8 +146,33 @@ export default function AdminLayout({
               )}
             >
               <HardDrive className="h-5 w-5 shrink-0" />
-              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden") }>
+              <span
+                className={cn(
+                  "transition-all duration-300",
+                  isCollapsed && "w-0 overflow-hidden",
+                )}
+              >
                 Assets
+              </span>
+            </Link>
+
+            <Link
+              href="/admin/profile"
+              className={cn(
+                "group relative flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition",
+                pathname === "/admin/profile"
+                  ? "bg-white/10 text-white"
+                  : "text-zinc-400 hover:bg-white/5",
+              )}
+            >
+              <UserRound className="h-5 w-5 shrink-0" />
+              <span
+                className={cn(
+                  "transition-all duration-300",
+                  isCollapsed && "w-0 overflow-hidden",
+                )}
+              >
+                Profile
               </span>
             </Link>
           </nav>
@@ -148,7 +187,12 @@ export default function AdminLayout({
               ) : (
                 <ChevronLeft className="h-5 w-5 shrink-0" />
               )}
-              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>
+              <span
+                className={cn(
+                  "transition-all duration-300",
+                  isCollapsed && "w-0 overflow-hidden",
+                )}
+              >
                 Collapse
               </span>
             </button>
@@ -158,7 +202,12 @@ export default function AdminLayout({
               className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold text-zinc-400 transition hover:bg-white/5"
             >
               <LogOut className="h-5 w-5 shrink-0" />
-              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>
+              <span
+                className={cn(
+                  "transition-all duration-300",
+                  isCollapsed && "w-0 overflow-hidden",
+                )}
+              >
                 Logout
               </span>
             </button>
@@ -166,14 +215,14 @@ export default function AdminLayout({
         </div>
       </aside>
 
-      <main className={cn(
-        "relative z-10 h-screen overflow-hidden transition-[margin-left] duration-300",
-        isCollapsed ? "ml-20" : "ml-64",
-      )}>
+      <main
+        className={cn(
+          "relative z-10 h-screen overflow-hidden transition-[margin-left] duration-300",
+          isCollapsed ? "ml-20" : "ml-64",
+        )}
+      >
         <div className="h-full overflow-y-auto">
-          <div className="px-6 py-6 sm:px-8">
-            {children}
-          </div>
+          <div className="px-6 py-6 sm:px-8">{children}</div>
         </div>
       </main>
     </div>
