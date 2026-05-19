@@ -1,11 +1,28 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Edit, Loader, Plus, RefreshCw, Save, Search, Trash2, X } from "lucide-react";
+import {
+  AlertCircle,
+  Edit,
+  Loader,
+  Plus,
+  RefreshCw,
+  Save,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import UserSelect from "@/components/ui/user-select";
 import { isApiError } from "@/lib/api/client";
 import {
   createAsset,
@@ -57,14 +74,23 @@ const toFormState = (asset: Asset): AssetFormState => ({
 
 const toNullable = (value: string) => (value.trim() ? value.trim() : null);
 
-export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: string }) {
+export function AssetCrudPage({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle: string;
+}) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
-  const [detailState, setDetailState] = useState<DetailState>({ asset: null, loading: false });
+  const [detailState, setDetailState] = useState<DetailState>({
+    asset: null,
+    loading: false,
+  });
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [mode, setMode] = useState<"create" | "edit" | null>(null);
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
@@ -106,25 +132,43 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
         asset.notes,
       ];
 
-      return searchableValues.some((value) => value?.toLowerCase().includes(query));
+      return searchableValues.some((value) =>
+        value?.toLowerCase().includes(query),
+      );
     });
   }, [assets, searchQuery]);
 
   const assetMetrics = useMemo(() => {
     const totalAssets = assets.length;
-    const assignedAssets = assets.filter((asset) => Boolean(asset.assignedToUserId || asset.assignedToUser?.email)).length;
+    const assignedAssets = assets.filter((asset) =>
+      Boolean(asset.assignedToUserId || asset.assignedToUser?.email),
+    ).length;
     const recentlyPurchased = assets.filter((asset) => {
       if (!asset.purchasedAt) {
         return false;
       }
 
-      return new Date(asset.purchasedAt).getFullYear() >= new Date().getFullYear();
+      return (
+        new Date(asset.purchasedAt).getFullYear() >= new Date().getFullYear()
+      );
     }).length;
 
     return [
-      { label: "Total assets", value: totalAssets.toString(), description: "Records in inventory" },
-      { label: "Assigned", value: assignedAssets.toString(), description: "Linked to users" },
-      { label: "Purchased this year", value: recentlyPurchased.toString(), description: "Recent procurement" },
+      {
+        label: "Total assets",
+        value: totalAssets.toString(),
+        description: "Records in inventory",
+      },
+      {
+        label: "Assigned",
+        value: assignedAssets.toString(),
+        description: "Linked to users",
+      },
+      {
+        label: "Purchased this year",
+        value: recentlyPurchased.toString(),
+        description: "Recent procurement",
+      },
     ];
   }, [assets]);
 
@@ -141,7 +185,9 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
         setDetailState({ asset: fullAsset, loading: false });
       } catch (err) {
         setDetailState({ asset: null, loading: false });
-        setError(isApiError(err) ? err.message : "Failed to load asset details");
+        setError(
+          isApiError(err) ? err.message : "Failed to load asset details",
+        );
       }
     })();
   };
@@ -196,7 +242,11 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
     try {
       if (mode === "edit" && editingAssetId) {
         const updated = await updateAsset(editingAssetId, payload);
-        setAssets((current) => current.map((asset) => (asset.id === editingAssetId ? updated : asset)));
+        setAssets((current) =>
+          current.map((asset) =>
+            asset.id === editingAssetId ? updated : asset,
+          ),
+        );
         setSelectedAssetId(updated.id);
         setDetailState({ asset: updated, loading: false });
         setIsDetailOpen(true);
@@ -217,7 +267,9 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
   };
 
   const handleDelete = async (asset: Asset) => {
-    const confirmed = window.confirm(`Delete asset ${asset.assetTag || asset.id}?`);
+    const confirmed = window.confirm(
+      `Delete asset ${asset.assetTag || asset.id}?`,
+    );
     if (!confirmed) {
       return;
     }
@@ -229,7 +281,11 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
       await deleteAsset(asset.id);
       setAssets((current) => current.filter((item) => item.id !== asset.id));
       setSelectedAssetId((current) => (current === asset.id ? null : current));
-      setDetailState((current) => (current.asset?.id === asset.id ? { asset: null, loading: false } : current));
+      setDetailState((current) =>
+        current.asset?.id === asset.id
+          ? { asset: null, loading: false }
+          : current,
+      );
       if (selectedAssetId === asset.id) {
         closeAssetDetails();
       }
@@ -241,19 +297,31 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
   };
 
   return (
-    <section className="space-y-8 pb-24 pt-2 sm:pt-4">
-      <div className="overflow-hidden rounded-[32px] border border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur">
-        <div className="border-b border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.1),rgba(255,255,255,0.03),transparent)] px-6 py-7 sm:px-8 sm:py-8">
+    <section className="space-y-6 pb-12 pt-4 sm:pt-6">
+      <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5 shadow-lg">
+        <div className="border-b border-white/10 px-6 py-5 sm:px-8 sm:py-6">
           <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-3xl space-y-3">
-              <p className="text-xs uppercase tracking-[0.38em] text-zinc-500">Asset management</p>
-              <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">{title}</h1>
-              <p className="max-w-2xl text-sm leading-6 text-zinc-400 sm:text-base">{subtitle}</p>
+              <p className="text-xs uppercase tracking-[0.38em] text-zinc-500">
+                Asset management
+              </p>
+              <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                {title}
+              </h1>
+              <p className="max-w-2xl text-sm leading-6 text-zinc-400 sm:text-base">
+                {subtitle}
+              </p>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center xl:justify-end">
-              <Button type="button" onClick={loadAssets} className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700">
-                <RefreshCw className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} />
+              <Button
+                type="button"
+                onClick={loadAssets}
+                className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700"
+              >
+                <RefreshCw
+                  className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")}
+                />
                 Refresh
               </Button>
               <Button type="button" onClick={openCreate}>
@@ -264,12 +332,19 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
           </div>
         </div>
 
-        <div className="grid gap-4 border-b border-white/10 px-6 py-6 sm:grid-cols-2 xl:grid-cols-3 sm:px-8">
+        <div className="grid gap-4 border-b border-white/10 px-6 py-4 sm:grid-cols-2 xl:grid-cols-3 sm:px-8">
           {assetMetrics.map((metric) => (
-            <div key={metric.label} className="rounded-3xl border border-white/10 bg-zinc-950/35 p-5">
-              <p className="text-xs uppercase tracking-[0.28em] text-zinc-500">{metric.label}</p>
+            <div
+              key={metric.label}
+              className="rounded-lg border border-white/10 bg-zinc-950/35 p-4"
+            >
+              <p className="text-xs uppercase tracking-[0.28em] text-zinc-500">
+                {metric.label}
+              </p>
               <div className="mt-3 flex items-end justify-between gap-4">
-                <p className="text-3xl font-semibold text-white">{metric.value}</p>
+                <p className="text-3xl font-semibold text-white">
+                  {metric.value}
+                </p>
               </div>
               <p className="mt-2 text-sm text-zinc-400">{metric.description}</p>
             </div>
@@ -285,12 +360,15 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
       )}
 
       <Card className="border-white/10 bg-white/5 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
-        <CardHeader className="border-b border-white/10 bg-white/[0.03] px-6 py-6 sm:px-8">
+        <CardHeader className="border-b border-white/10 bg-white/[0.03] px-6 py-4 sm:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-2">
-              <CardTitle className="text-xl text-white">Asset inventory</CardTitle>
+              <CardTitle className="text-xl text-white">
+                Asset inventory
+              </CardTitle>
               <CardDescription className="max-w-2xl text-zinc-400">
-                Browse records, inspect ownership, and manage lifecycle data without losing context.
+                Browse records, inspect ownership, and manage lifecycle data
+                without losing context.
               </CardDescription>
             </div>
             <div className="w-full lg:max-w-md">
@@ -308,18 +386,25 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
         </CardHeader>
         <CardContent className="px-0 pb-0">
           {isLoading ? (
-            <div className="m-6 flex items-center justify-center gap-3 rounded-3xl border border-white/10 bg-white/5 py-16 text-sm text-zinc-400 sm:m-8">
+            <div className="m-6 flex items-center justify-center gap-3 rounded-lg border border-white/10 bg-white/5 py-12 text-sm text-zinc-400 sm:m-8">
               <Loader className="h-5 w-5 animate-spin" />
               Loading assets...
             </div>
           ) : filteredAssets.length === 0 ? (
-            <div className="m-6 rounded-3xl border border-dashed border-white/10 bg-white/5 px-6 py-12 text-center sm:m-8">
-              <p className="text-base font-medium text-white">No assets match your search</p>
+            <div className="m-6 rounded-lg border border-dashed border-white/10 bg-white/5 px-4 py-8 text-center sm:m-8">
+              <p className="text-base font-medium text-white">
+                No assets match your search
+              </p>
               <p className="mt-2 text-sm text-zinc-400">
-                Try a different keyword or clear the search to see the full inventory.
+                Try a different keyword or clear the search to see the full
+                inventory.
               </p>
               <div className="mt-6 flex justify-center">
-                <Button type="button" onClick={() => setSearchQuery("")} className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700">
+                <Button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700"
+                >
                   Clear search
                 </Button>
               </div>
@@ -330,14 +415,30 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
                 <table className="w-full min-w-[980px] border-separate border-spacing-0 text-left text-sm">
                   <thead className="sticky top-0 z-10 bg-zinc-950/95 text-[11px] uppercase tracking-[0.28em] text-zinc-500 backdrop-blur">
                     <tr>
-                      <th className="border-b border-white/10 px-6 py-4 font-medium">Asset</th>
-                      <th className="border-b border-white/10 px-4 py-4 font-medium">Type</th>
-                      <th className="border-b border-white/10 px-4 py-4 font-medium">Brand</th>
-                      <th className="border-b border-white/10 px-4 py-4 font-medium">Model</th>
-                      <th className="border-b border-white/10 px-4 py-4 font-medium">Serial</th>
-                      <th className="border-b border-white/10 px-4 py-4 font-medium">Assigned To</th>
-                      <th className="border-b border-white/10 px-4 py-4 font-medium">Purchased</th>
-                      <th className="border-b border-white/10 px-6 py-4 text-right font-medium">Actions</th>
+                      <th className="border-b border-white/10 px-6 py-4 font-medium">
+                        Asset
+                      </th>
+                      <th className="border-b border-white/10 px-4 py-4 font-medium">
+                        Type
+                      </th>
+                      <th className="border-b border-white/10 px-4 py-4 font-medium">
+                        Brand
+                      </th>
+                      <th className="border-b border-white/10 px-4 py-4 font-medium">
+                        Model
+                      </th>
+                      <th className="border-b border-white/10 px-4 py-4 font-medium">
+                        Serial
+                      </th>
+                      <th className="border-b border-white/10 px-4 py-4 font-medium">
+                        Assigned To
+                      </th>
+                      <th className="border-b border-white/10 px-4 py-4 font-medium">
+                        Purchased
+                      </th>
+                      <th className="border-b border-white/10 px-6 py-4 text-right font-medium">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -349,30 +450,46 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
                           onClick={() => openAssetDetails(asset)}
                           className={cn(
                             "group cursor-pointer transition",
-                            isSelected ? "bg-white/10" : "hover:bg-white/[0.04]",
+                            isSelected
+                              ? "bg-white/10"
+                              : "hover:bg-white/[0.04]",
                           )}
                         >
-                          <td className="border-b border-white/5 px-6 py-5 align-top">
+                          <td className="border-b border-white/5 px-4 py-3 align-top">
                             <div className="space-y-1.5">
-                              <p className="font-medium text-white">{asset.assetTag || "Untitled asset"}</p>
-                              <p className="text-xs text-zinc-500">{asset.serialNumber || "No serial number"}</p>
+                              <p className="font-medium text-white">
+                                {asset.assetTag || "Untitled asset"}
+                              </p>
+                              <p className="text-xs text-zinc-500">
+                                {asset.serialNumber || "No serial number"}
+                              </p>
                             </div>
                           </td>
-                          <td className="border-b border-white/5 px-4 py-5 align-top text-zinc-300">
+                          <td className="border-b border-white/5 px-4 py-3 align-top text-zinc-300">
                             <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-zinc-200">
                               {asset.deviceType}
                             </span>
                           </td>
-                          <td className="border-b border-white/5 px-4 py-5 align-top text-zinc-400">{asset.brand || "-"}</td>
-                          <td className="border-b border-white/5 px-4 py-5 align-top text-zinc-400">{asset.model || "-"}</td>
-                          <td className="border-b border-white/5 px-4 py-5 align-top text-zinc-400">{asset.serialNumber || "-"}</td>
-                          <td className="border-b border-white/5 px-4 py-5 align-top text-zinc-400">
-                            {asset.assignedToUser?.email || asset.assignedToUserId || "-"}
+                          <td className="border-b border-white/5 px-4 py-3 align-top text-zinc-400">
+                            {asset.brand || "-"}
                           </td>
-                          <td className="border-b border-white/5 px-4 py-5 align-top text-zinc-400">
-                            {asset.purchasedAt ? asset.purchasedAt.slice(0, 10) : "-"}
+                          <td className="border-b border-white/5 px-4 py-3 align-top text-zinc-400">
+                            {asset.model || "-"}
                           </td>
-                          <td className="border-b border-white/5 px-6 py-5 align-top">
+                          <td className="border-b border-white/5 px-4 py-3 align-top text-zinc-400">
+                            {asset.serialNumber || "-"}
+                          </td>
+                          <td className="border-b border-white/5 px-4 py-3 align-top text-zinc-400">
+                            {asset.assignedToUser?.email ||
+                              asset.assignedToUserId ||
+                              "-"}
+                          </td>
+                          <td className="border-b border-white/5 px-4 py-3 align-top text-zinc-400">
+                            {asset.purchasedAt
+                              ? asset.purchasedAt.slice(0, 10)
+                              : "-"}
+                          </td>
+                          <td className="border-b border-white/5 px-4 py-3 align-top">
                             <div className="flex justify-end gap-2">
                               <Button
                                 type="button"
@@ -412,16 +529,23 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
       </Card>
 
       {isDetailOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur" onClick={closeAssetDetails}>
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur"
+          onClick={closeAssetDetails}
+        >
           <div
-            className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black shadow-2xl shadow-black/60"
+            className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-lg"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="border-b border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02),transparent)] px-8 py-6">
+            <div className="border-b border-zinc-800 px-6 py-4">
               <div className="flex items-start justify-between gap-6">
                 <div className="space-y-1.5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.35em] text-zinc-500">Asset Information</p>
-                  <h2 className="text-2xl font-bold tracking-tight text-white">Asset Details</h2>
+                  <p className="text-xs font-semibold uppercase tracking-[0.35em] text-zinc-500">
+                    Asset Information
+                  </p>
+                  <h2 className="text-2xl font-bold tracking-tight text-white">
+                    Asset Details
+                  </h2>
                 </div>
                 <button
                   type="button"
@@ -433,7 +557,7 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
               {detailState.loading ? (
                 <div className="flex items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/5 py-12 text-sm text-zinc-400">
                   <Loader className="h-5 w-5 animate-spin" />
@@ -444,8 +568,12 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
                   <div className="rounded-2xl border border-white/15 bg-[linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-6">
                     <div className="flex flex-wrap items-end justify-between gap-4">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-zinc-500">Asset Tag</p>
-                        <p className="mt-2 text-3xl font-bold text-white">{detailState.asset.assetTag || "Untitled asset"}</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-zinc-500">
+                          Asset Tag
+                        </p>
+                        <p className="mt-2 text-3xl font-bold text-white">
+                          {detailState.asset.assetTag || "Untitled asset"}
+                        </p>
                       </div>
                       <div className="inline-flex rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-zinc-200">
                         {detailState.asset.deviceType}
@@ -453,22 +581,63 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
                     </div>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <DetailRow label="Device type" value={detailState.asset.deviceType} />
-                    <DetailRow label="Brand" value={detailState.asset.brand || "-"} />
-                    <DetailRow label="Model" value={detailState.asset.model || "-"} />
-                    <DetailRow label="Serial number" value={detailState.asset.serialNumber || "-"} />
-                    <DetailRow label="Assigned to" value={detailState.asset.assignedToUser?.email || detailState.asset.assignedToUserId || "-"} />
-                    <DetailRow label="Purchased at" value={detailState.asset.purchasedAt ? detailState.asset.purchasedAt.slice(0, 10) : "-"} />
-                    <DetailRow label="Created at" value={detailState.asset.createdAt ? detailState.asset.createdAt.slice(0, 10) : "-"} />
+                    <DetailRow
+                      label="Device type"
+                      value={detailState.asset.deviceType}
+                    />
+                    <DetailRow
+                      label="Brand"
+                      value={detailState.asset.brand || "-"}
+                    />
+                    <DetailRow
+                      label="Model"
+                      value={detailState.asset.model || "-"}
+                    />
+                    <DetailRow
+                      label="Serial number"
+                      value={detailState.asset.serialNumber || "-"}
+                    />
+                    <DetailRow
+                      label="Assigned to"
+                      value={
+                        detailState.asset.assignedToUser?.email ||
+                        detailState.asset.assignedToUserId ||
+                        "-"
+                      }
+                    />
+                    <DetailRow
+                      label="Purchased at"
+                      value={
+                        detailState.asset.purchasedAt
+                          ? detailState.asset.purchasedAt.slice(0, 10)
+                          : "-"
+                      }
+                    />
+                    <DetailRow
+                      label="Created at"
+                      value={
+                        detailState.asset.createdAt
+                          ? detailState.asset.createdAt.slice(0, 10)
+                          : "-"
+                      }
+                    />
                   </div>
                   <div className="rounded-2xl border border-white/15 bg-white/5 p-5">
-                    <p className="text-xs font-semibold uppercase tracking-[0.3em] text-zinc-500">Notes</p>
-                    <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-300">{detailState.asset.notes || "No notes provided."}</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.3em] text-zinc-500">
+                      Notes
+                    </p>
+                    <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-300">
+                      {detailState.asset.notes || "No notes provided."}
+                    </p>
                   </div>
                   {detailState.asset.tickets && (
                     <div className="rounded-2xl border border-white/15 bg-white/5 p-5">
-                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-zinc-500">Tickets</p>
-                      <p className="mt-3 text-sm text-zinc-300">{detailState.asset.tickets.length} linked ticket(s)</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-zinc-500">
+                        Tickets
+                      </p>
+                      <p className="mt-3 text-sm text-zinc-300">
+                        {detailState.asset.tickets.length} linked ticket(s)
+                      </p>
                     </div>
                   )}
                 </div>
@@ -484,16 +653,20 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
 
       {(mode === "create" || mode === "edit") && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur">
-          <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black shadow-2xl shadow-black/60">
-            <div className="border-b border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02),transparent)] px-8 py-6">
+          <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-lg">
+            <div className="border-b border-zinc-800 px-6 py-4">
               <div className="flex items-start justify-between gap-6">
                 <div className="space-y-1.5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.35em] text-zinc-500">Asset Editor</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.35em] text-zinc-500">
+                    Asset Editor
+                  </p>
                   <h2 className="text-2xl font-bold tracking-tight text-white">
                     {mode === "edit" ? "Edit asset" : "Create asset"}
                   </h2>
                   <p className="max-w-xl text-sm leading-6 text-zinc-400">
-                    {mode === "edit" ? "Update the asset information below." : "Add a new asset to your inventory."}
+                    {mode === "edit"
+                      ? "Update the asset information below."
+                      : "Add a new asset to your inventory."}
                   </p>
                 </div>
                 <button
@@ -511,56 +684,96 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
                 <Field label="Device type" required>
                   <Input
                     value={formState.deviceType}
-                    onChange={(event) => setFormState((current) => ({ ...current, deviceType: event.target.value }))}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        deviceType: event.target.value,
+                      }))
+                    }
                     placeholder="Laptop"
                   />
                 </Field>
                 <Field label="Asset tag">
                   <Input
                     value={formState.assetTag}
-                    onChange={(event) => setFormState((current) => ({ ...current, assetTag: event.target.value }))}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        assetTag: event.target.value,
+                      }))
+                    }
                     placeholder="IT-2026-0001"
                   />
                 </Field>
-                <Field label="Assigned to user ID">
-                  <Input
+                <Field label="Assigned to user">
+                  <UserSelect
                     value={formState.assignedToUserId}
-                    onChange={(event) => setFormState((current) => ({ ...current, assignedToUserId: event.target.value }))}
-                    placeholder="UUID"
+                    onChange={(id) =>
+                      setFormState((current) => ({
+                        ...current,
+                        assignedToUserId: id,
+                      }))
+                    }
+                    placeholder="Search users by name or email"
                   />
                 </Field>
                 <Field label="Purchased at">
                   <Input
                     type="date"
                     value={formState.purchasedAt}
-                    onChange={(event) => setFormState((current) => ({ ...current, purchasedAt: event.target.value }))}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        purchasedAt: event.target.value,
+                      }))
+                    }
                   />
                 </Field>
                 <Field label="Brand">
                   <Input
                     value={formState.brand}
-                    onChange={(event) => setFormState((current) => ({ ...current, brand: event.target.value }))}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        brand: event.target.value,
+                      }))
+                    }
                     placeholder="Dell"
                   />
                 </Field>
                 <Field label="Model">
                   <Input
                     value={formState.model}
-                    onChange={(event) => setFormState((current) => ({ ...current, model: event.target.value }))}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        model: event.target.value,
+                      }))
+                    }
                     placeholder="Latitude 5440"
                   />
                 </Field>
                 <Field label="Serial number">
                   <Input
                     value={formState.serialNumber}
-                    onChange={(event) => setFormState((current) => ({ ...current, serialNumber: event.target.value }))}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        serialNumber: event.target.value,
+                      }))
+                    }
                     placeholder="SN123456789"
                   />
                 </Field>
                 <Field label="Notes" className="sm:col-span-2">
                   <textarea
                     value={formState.notes}
-                    onChange={(event) => setFormState((current) => ({ ...current, notes: event.target.value }))}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        notes: event.target.value,
+                      }))
+                    }
                     placeholder="Asset remarks, location, or assignment notes"
                     rows={5}
                     className="flex min-h-32 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] outline-none transition placeholder:text-zinc-500 hover:border-white/20 focus:border-white/30 focus:ring-2 focus:ring-white/10"
@@ -569,13 +782,26 @@ export function AssetCrudPage({ title, subtitle }: { title: string; subtitle: st
               </div>
             </div>
 
-            <div className="border-t border-white/10 bg-[linear-gradient(180deg,rgba(39,39,42,0.4),rgba(9,9,11,0.8))] px-8 py-5 backdrop-blur">
+            <div className="border-t border-zinc-800 px-6 py-4 bg-transparent">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                <Button type="button" className="h-10 bg-zinc-800 text-zinc-50 hover:bg-zinc-700" onClick={closeModal}>
+                <Button
+                  type="button"
+                  className="h-10 bg-zinc-800 text-zinc-50 hover:bg-zinc-700"
+                  onClick={closeModal}
+                >
                   Cancel
                 </Button>
-                <Button type="button" onClick={handleSubmit} disabled={isSubmitting} className="h-10">
-                  {isSubmitting ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                <Button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className="h-10"
+                >
+                  {isSubmitting ? (
+                    <Loader className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
                   {mode === "edit" ? "Update Asset" : "Create Asset"}
                 </Button>
               </div>
