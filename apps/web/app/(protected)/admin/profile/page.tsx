@@ -26,7 +26,7 @@ type ProfileState = {
   isLoading: boolean;
 };
 
-export default function ProfilePage() {
+export default function AdminProfilePage() {
   const [state, setState] = useState<ProfileState>({
     data: null,
     error: null,
@@ -83,7 +83,7 @@ export default function ProfilePage() {
               Profile
             </p>
             <h1 className="mt-1 text-3xl font-semibold text-white">
-              Authenticated user
+              Admin account
             </h1>
           </div>
         </div>

@@ -30,9 +30,9 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-zinc-950 border border-zinc-800 shadow-2xl">
-        <div className="flex items-start justify-between border-b border-zinc-800/50 px-4 py-3">
+    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-950/95 shadow-2xl shadow-black/50 backdrop-blur">
+        <div className="flex items-start justify-between border-b border-white/10 px-6 py-5">
           <div>
             {title && (
               <h3 className="text-lg font-semibold text-white">{title}</h3>
@@ -41,24 +41,27 @@ export function Modal({
               <p className="mt-1 text-sm text-zinc-400">{description}</p>
             )}
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white">
+          <button
+            onClick={onClose}
+            className="rounded-full p-1 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="px-4 py-4">{children}</div>
+        <div className="px-6 py-5">{children}</div>
 
-        <div className="flex items-center gap-3 justify-end border-t border-zinc-800/50 px-4 py-3">
+        <div className="flex items-center justify-end gap-3 border-t border-white/10 px-6 py-5">
           <button
             onClick={onClose}
-            className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-white"
+            className="h-10 rounded-2xl border border-white/10 px-4 text-sm text-zinc-100 transition hover:border-white/20 hover:bg-white/5"
           >
             {cancelLabel}
           </button>
           <button
             onClick={onConfirm}
             disabled={loading}
-            className="rounded-lg bg-white px-3 py-2 text-sm font-semibold text-zinc-950 disabled:opacity-60"
+            className="h-10 rounded-2xl bg-white px-4 text-sm font-semibold text-zinc-950 shadow-lg shadow-black/20 transition hover:bg-zinc-100 disabled:opacity-60"
           >
             {loading ? "Working…" : confirmLabel}
           </button>
