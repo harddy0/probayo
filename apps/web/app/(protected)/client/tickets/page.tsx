@@ -1,27 +1,27 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertCircle,
   Download,
   FileUp,
   Loader,
-  MessageSquare,
-  Paperclip,
   Plus,
   RefreshCw,
-  Ticket as TicketIcon,
+  Search,
   Trash2,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast-provider";
 import TicketCreateModal from "@/components/tickets/ticket-create-modal";
@@ -114,6 +114,8 @@ type UploadItem = {
   error?: string;
 };
 
+type TabId = "details" | "attachments" | "comments";
+
 const formatDateTime = (value?: string | null) => {
   if (!value) return "—";
   const date = new Date(value);
@@ -189,13 +191,71 @@ const pollAttachmentJob = async (jobId: string) => {
   throw new Error("Upload timed out.");
 };
 
+function AttachmentImage({ attachment }: { attachment: TicketAttachment }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    downloadAttachment(attachment.id)
+      .then(({ blob }) => {
+        if (cancelled) return;
+        const objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError(true);
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachment.id]);
+
+  if (loading) {
+    return (
+      <div className="flex h-32 w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]">
+        <Loader className="h-5 w-5 animate-spin text-zinc-400" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-32 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03]">
+        <AlertCircle className="h-4 w-4 text-rose-400" />
+        <span className="text-xs text-zinc-500">Failed to load</span>
+      </div>
+    );
+  }
+
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt={attachment.fileName}
+        className="max-h-48 rounded-xl object-contain"
+      />
+    );
+  }
+
+  return null;
+}
+
 export default function ClientTicketsPage() {
   const { push } = useToast();
   const session = getAuthSession();
   const currentUserId = session?.identity?.userId ?? null;
 
   const [tickets, setTickets] = useState<TicketRecord[]>([]);
-  const [filters, setFilters] = useState<TicketListFilters>({});
+  const [filters] = useState<TicketListFilters>({});
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<TicketRecord | null>(
     null,
@@ -217,8 +277,20 @@ export default function ClientTicketsPage() {
   const [isCommentSubmitting, setIsCommentSubmitting] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<UploadItem[]>([]);
 
+  // New UI state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>("details");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterPriority, setFilterPriority] = useState<string>("all");
+  const [isKnownIssuesDismissed, setIsKnownIssuesDismissed] = useState(false);
+
+  // Track active detail request to prevent stale responses
+  const activeDetailRequestRef = useRef<string | null>(null);
+
   const ticketFileInputRef = useRef<HTMLInputElement | null>(null);
   const commentFileInputRef = useRef<HTMLInputElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const assetsForUser = useMemo(() => {
     if (!currentUserId) {
@@ -227,6 +299,25 @@ export default function ClientTicketsPage() {
     return assets.filter((asset) => asset.assignedToUserId === currentUserId);
   }, [assets, currentUserId]);
 
+  const filteredTickets = useMemo(() => {
+    let result = tickets;
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((t) => t.title.toLowerCase().includes(q));
+    }
+
+    if (filterStatus && filterStatus !== "all") {
+      result = result.filter((t) => t.status === filterStatus);
+    }
+
+    if (filterPriority && filterPriority !== "all") {
+      result = result.filter((t) => t.priority === filterPriority);
+    }
+
+    return result;
+  }, [tickets, searchQuery, filterStatus, filterPriority]);
+
   const loadTickets = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -234,14 +325,7 @@ export default function ClientTicketsPage() {
     try {
       const data = await fetchTickets(filters);
       setTickets(data);
-      setSelectedTicketId((current) => {
-        if (!data.length) return null;
-        if (current && data.some((ticket) => ticket.id === current)) {
-          return current;
-        }
-        const firstTicket = data[0];
-        return firstTicket ? firstTicket.id : null;
-      });
+      // Don't auto-select first ticket anymore — selection is manual via modal
     } catch (err) {
       setError(isApiError(err) ? err.message : "Failed to load tickets.");
     } finally {
@@ -250,17 +334,23 @@ export default function ClientTicketsPage() {
   }, [filters]);
 
   const loadTicketDetail = useCallback(async (ticketId: string) => {
+    activeDetailRequestRef.current = ticketId;
     setIsDetailLoading(true);
     setDetailError(null);
 
     try {
       const detail = await fetchTicketById(ticketId);
+      // Ignore stale responses from older requests
+      if (activeDetailRequestRef.current !== ticketId) return;
       setSelectedTicket(detail);
     } catch (err) {
+      if (activeDetailRequestRef.current !== ticketId) return;
       setDetailError(isApiError(err) ? err.message : "Failed to load ticket.");
       setSelectedTicket(null);
     } finally {
-      setIsDetailLoading(false);
+      if (activeDetailRequestRef.current === ticketId) {
+        setIsDetailLoading(false);
+      }
     }
   }, []);
 
@@ -299,6 +389,8 @@ export default function ClientTicketsPage() {
     void loadReferenceData();
   }, [loadReferenceData]);
 
+
+
   const ticketAttachments = useMemo(() => {
     if (!selectedTicket?.attachments) return [];
     return selectedTicket.attachments.filter(
@@ -308,16 +400,30 @@ export default function ClientTicketsPage() {
 
   const handleRefresh = async () => {
     await loadTickets();
-    if (selectedTicketId) {
-      await loadTicketDetail(selectedTicketId);
-    }
   };
 
   const handleTicketCreated = (ticket: TicketRecord) => {
     setTickets((current) => [ticket, ...current]);
-    setSelectedTicketId(ticket.id);
-    setSelectedTicket(ticket);
     void loadTicketDetail(ticket.id);
+    setSelectedTicketId(ticket.id);
+    setIsModalOpen(true);
+    setActiveTab("details");
+    setSelectedTicket(ticket);
+  };
+
+  const handleRowClick = (ticketId: string) => {
+    setSelectedTicket(null);
+    setIsDetailLoading(true);
+    setSelectedTicketId(ticketId);
+    setIsModalOpen(true);
+    setActiveTab("details");
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedTicket(null);
+    setSelectedTicketId(null);
+    setActiveTab("details");
   };
 
   const updateUploadItem = (id: string, update: Partial<UploadItem>) => {
@@ -467,485 +573,706 @@ export default function ClientTicketsPage() {
     }
   };
 
-  const ticketListEmpty = !isLoading && tickets.length === 0;
+  const ticketListEmpty = !isLoading && filteredTickets.length === 0;
+  const activeKnownIssuesCount = knownIssues.filter(
+    (i) => i.status === "active",
+  ).length;
 
   return (
-    <section className="space-y-6 pb-24">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <section className="space-y-8 pb-24">
+      {/* ── Page Header ── */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.35em] text-zinc-500">
-            Tickets
+          <p className="text-[10px] uppercase tracking-widest text-zinc-500">
+            Service Requests
           </p>
-          <h1 className="mt-2 text-3xl font-semibold text-white">
-            Service requests
+          <h1 className="mt-1.5 text-3xl font-semibold tracking-tight text-white">
+            Tickets
           </h1>
-          <p className="mt-2 text-sm text-zinc-400">
-            Track IT support tickets, attach files, and add updates.
+          <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">
+            Track and manage your IT support tickets
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           <Button
-            className="h-11 bg-zinc-800 text-zinc-50 hover:bg-zinc-700"
+            className="h-10 bg-white/10 text-zinc-200 hover:bg-white/15"
             onClick={handleRefresh}
           >
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
-          <Button className="h-11" onClick={() => setIsCreateOpen(true)}>
+          <Button className="h-10" onClick={() => setIsCreateOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             New ticket
           </Button>
         </div>
       </div>
 
+      {/* ── Error Banner ── */}
       {error ? (
-        <div className="flex gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4">
-          <AlertCircle className="h-5 w-5 text-rose-400" />
-          <p className="text-sm text-rose-200">{error}</p>
+        <div className="flex items-center gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4">
+          <AlertCircle className="h-5 w-5 shrink-0 text-rose-400" />
+          <p className="text-sm leading-relaxed text-rose-200">{error}</p>
         </div>
       ) : null}
 
       {referenceError ? (
-        <div className="flex gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
-          <AlertCircle className="h-5 w-5 text-amber-300" />
-          <p className="text-sm text-amber-200">{referenceError}</p>
+        <div className="flex items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
+          <AlertCircle className="h-5 w-5 shrink-0 text-amber-300" />
+          <p className="text-sm leading-relaxed text-amber-200">{referenceError}</p>
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,_360px)_minmax(0,_1fr)]">
-        <div className="space-y-4">
-          <Card className="border-white/10 bg-white/5">
-            <CardHeader>
-              <CardTitle className="text-lg">Filters</CardTitle>
-              <CardDescription>Refine your ticket list.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <select
-                  value={filters.status ?? ""}
-                  onChange={(event) =>
-                    setFilters((current) => ({
-                      ...current,
-                      status: event.target.value
-                        ? (event.target.value as TicketStatus)
-                        : undefined,
-                    }))
-                  }
-                  className="flex h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-zinc-50 outline-none transition hover:border-white/20 focus:border-white/30 focus:ring-2 focus:ring-white/10"
-                >
-                  <option value="">All statuses</option>
-                  {Object.entries(statusLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Priority</Label>
-                <select
-                  value={filters.priority ?? ""}
-                  onChange={(event) =>
-                    setFilters((current) => ({
-                      ...current,
-                      priority: event.target.value
-                        ? (event.target.value as TicketPriority)
-                        : undefined,
-                    }))
-                  }
-                  className="flex h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-zinc-50 outline-none transition hover:border-white/20 focus:border-white/30 focus:ring-2 focus:ring-white/10"
-                >
-                  <option value="">All priorities</option>
-                  {Object.entries(priorityLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-white/10 bg-white/5">
-            <CardHeader className="flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-lg">My tickets</CardTitle>
-                <CardDescription>
-                  {tickets.length} active records
-                </CardDescription>
-              </div>
-              <TicketIcon className="h-5 w-5 text-zinc-500" />
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center gap-2 text-sm text-zinc-400">
-                  <Loader className="h-4 w-4 animate-spin" />
-                  Loading tickets...
-                </div>
-              ) : ticketListEmpty ? (
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-zinc-400">
-                  No tickets yet. Create your first request.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {tickets.map((ticket) => {
-                    const isActive = ticket.id === selectedTicketId;
-                    return (
-                      <button
-                        key={ticket.id}
-                        type="button"
-                        onClick={() => setSelectedTicketId(ticket.id)}
-                        className={cn(
-                          "w-full rounded-2xl border px-4 py-3 text-left transition",
-                          isActive
-                            ? "border-white/30 bg-white/10"
-                            : "border-white/10 bg-white/5 hover:border-white/20",
-                        )}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-white">
-                              {ticket.title}
-                            </p>
-                            <p className="text-xs text-zinc-500">
-                              {ticket.category?.name || "Uncategorized"} ·{" "}
-                              {formatDateTime(ticket.createdAt)}
-                            </p>
-                          </div>
-                          <span
-                            className={cn(
-                              "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide",
-                              statusStyles[ticket.status],
-                            )}
-                          >
-                            {statusLabels[ticket.status]}
-                          </span>
-                        </div>
-                        <div className="mt-2 flex items-center justify-between text-xs text-zinc-400">
-                          <span
-                            className={cn(
-                              "rounded-full border px-2 py-0.5 text-[10px] uppercase",
-                              priorityStyles[ticket.priority],
-                            )}
-                          >
-                            {priorityLabels[ticket.priority]}
-                          </span>
-                          <span>
-                            {ticket._count?.comments ?? 0} comments ·{" "}
-                            {ticket._count?.attachments ?? 0} files
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+      {/* ── Known Issues Banner ── */}
+      {activeKnownIssuesCount > 0 && !isKnownIssuesDismissed ? (
+        <div className="flex items-center justify-between rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 shrink-0 text-amber-300" />
+            <p className="text-sm leading-relaxed text-amber-200">
+              There {activeKnownIssuesCount === 1 ? "is" : "are"}{" "}
+              <span className="font-semibold">{activeKnownIssuesCount}</span>{" "}
+              active known{" "}
+              {activeKnownIssuesCount === 1 ? "issue" : "issues"} that may
+              affect your request.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsKnownIssuesDismissed(true)}
+            className="shrink-0 rounded-full p-1 text-amber-400 transition hover:bg-white/5 hover:text-amber-200"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
+      ) : null}
 
-        <div className="space-y-6">
-          {isDetailLoading ? (
-            <Card className="border-white/10 bg-white/5">
-              <CardContent className="flex items-center gap-2 py-8 text-sm text-zinc-400">
-                <Loader className="h-4 w-4 animate-spin" />
-                Loading ticket details...
-              </CardContent>
-            </Card>
-          ) : detailError ? (
-            <Card className="border-rose-500/20 bg-rose-500/10">
-              <CardContent className="flex items-center gap-2 py-6 text-sm text-rose-200">
-                <AlertCircle className="h-4 w-4" />
-                {detailError}
-              </CardContent>
-            </Card>
-          ) : !selectedTicket ? (
-            <Card className="border-white/10 bg-white/5">
-              <CardContent className="py-10 text-center text-sm text-zinc-400">
-                Select a ticket to see details.
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              <Card className="border-white/10 bg-white/5">
-                <CardHeader>
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <CardTitle className="text-2xl">
-                        {selectedTicket.title}
-                      </CardTitle>
-                      <CardDescription className="mt-1">
-                        Ticket ID: {selectedTicket.id}
-                      </CardDescription>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={cn(
-                          "inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-wide",
-                          statusStyles[selectedTicket.status],
-                        )}
-                      >
-                        {statusLabels[selectedTicket.status]}
-                      </span>
-                      <span
-                        className={cn(
-                          "inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-wide",
-                          priorityStyles[selectedTicket.priority],
-                        )}
-                      >
-                        {priorityLabels[selectedTicket.priority]}
-                      </span>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <p className="text-sm text-zinc-200 whitespace-pre-line">
-                      {selectedTicket.description}
-                    </p>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <DetailItem
-                      label="Category"
-                      value={selectedTicket.category?.name || "—"}
-                    />
-                    <DetailItem
-                      label="Asset"
-                      value={selectedTicket.asset?.deviceType || "—"}
-                    />
-                    <DetailItem
-                      label="Assigned to"
-                      value={formatUserName(selectedTicket.assignedToUser)}
-                    />
-                    <DetailItem
-                      label="Created"
-                      value={formatDateTime(selectedTicket.createdAt)}
-                    />
-                    <DetailItem
-                      label="Updated"
-                      value={formatDateTime(selectedTicket.updatedAt)}
-                    />
-                    <DetailItem
-                      label="Acknowledged"
-                      value={formatDateTime(selectedTicket.acknowledgedAt)}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-white/10 bg-white/5">
-                <CardHeader className="flex-row items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Paperclip className="h-4 w-4 text-zinc-400" />
-                    <div>
-                      <CardTitle className="text-lg">Attachments</CardTitle>
-                      <CardDescription>
-                        Add files to help IT understand the issue.
-                      </CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="ticket-attachments">Upload files</Label>
-                    <input
-                      id="ticket-attachments"
-                      ref={ticketFileInputRef}
-                      type="file"
-                      multiple
-                      accept={ACCEPTED_FILE_TYPES}
-                      onChange={(event) =>
-                        void handleTicketFilesChange(event.target.files)
-                      }
-                      className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-xl file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
-                    />
-                    <p className="text-xs text-zinc-500">
-                      Max 10MB per file. Images, PDF, docs, spreadsheets, text,
-                      and archives supported.
-                    </p>
-                  </div>
-
-                  {ticketAttachments.length === 0 ? (
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-zinc-400">
-                      No attachments yet.
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {ticketAttachments.map((attachment) => (
-                        <AttachmentRow
-                          key={attachment.id}
-                          attachment={attachment}
-                          onDownload={handleDownloadAttachment}
-                          onDelete={handleDeleteAttachment}
-                          canDelete={
-                            attachment.uploadedByUserId === currentUserId
-                          }
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  {uploadQueue.length > 0 ? (
-                    <div className="space-y-2">
-                      <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-                        Uploads
-                      </p>
-                      {uploadQueue.map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300"
-                        >
-                          <span className="truncate">{item.fileName}</span>
-                          <span
-                            className={cn(
-                              "rounded-full px-2 py-0.5 text-[10px] uppercase",
-                              item.status === "completed"
-                                ? "bg-emerald-500/10 text-emerald-200"
-                                : item.status === "failed"
-                                  ? "bg-rose-500/10 text-rose-200"
-                                  : "bg-white/10 text-zinc-200",
-                            )}
-                          >
-                            {item.status}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
-
-              <Card className="border-white/10 bg-white/5">
-                <CardHeader className="flex-row items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-zinc-400" />
-                    <div>
-                      <CardTitle className="text-lg">Comments</CardTitle>
-                      <CardDescription>
-                        Share updates or respond to IT questions.
-                      </CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-5">
-                  {selectedTicket.comments &&
-                  selectedTicket.comments.length > 0 ? (
-                    <div className="space-y-3">
-                      {selectedTicket.comments.map((comment) => (
-                        <div
-                          key={comment.id}
-                          className="rounded-2xl border border-white/10 bg-white/5 p-4"
-                        >
-                          <div className="flex items-center justify-between text-xs text-zinc-500">
-                            <span>{formatUserName(comment.authorUser)}</span>
-                            <span>{formatDateTime(comment.createdAt)}</span>
-                          </div>
-                          <p className="mt-2 text-sm text-zinc-200 whitespace-pre-line">
-                            {comment.body}
-                          </p>
-
-                          {comment.attachments &&
-                          comment.attachments.length > 0 ? (
-                            <div className="mt-3 space-y-2">
-                              {comment.attachments.map((attachment) => (
-                                <AttachmentRow
-                                  key={attachment.id}
-                                  attachment={attachment}
-                                  onDownload={handleDownloadAttachment}
-                                  onDelete={handleDeleteAttachment}
-                                  canDelete={
-                                    attachment.uploadedByUserId ===
-                                    currentUserId
-                                  }
-                                  compact
-                                />
-                              ))}
-                            </div>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-zinc-400">
-                      No comments yet.
-                    </div>
-                  )}
-
-                  <div className="space-y-3">
-                    <Label>Add a comment</Label>
-                    <Textarea
-                      value={commentBody}
-                      onChange={(event) => setCommentBody(event.target.value)}
-                      placeholder="Share an update, question, or clarification"
-                      rows={4}
-                    />
-                    <input
-                      ref={commentFileInputRef}
-                      type="file"
-                      multiple
-                      accept={ACCEPTED_FILE_TYPES}
-                      onChange={(event) => setCommentFiles(event.target.files)}
-                      className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-xl file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
-                    />
-                    {commentError ? (
-                      <p className="text-sm text-rose-400">{commentError}</p>
-                    ) : null}
-                    <Button
-                      className="h-11"
-                      onClick={() => void handleCommentSubmit()}
-                      disabled={isCommentSubmitting}
-                    >
-                      {isCommentSubmitting ? (
-                        <Loader className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <FileUp className="mr-2 h-4 w-4" />
-                      )}
-                      Add comment
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {selectedTicket.statusHistory &&
-              selectedTicket.statusHistory.length > 0 ? (
-                <Card className="border-white/10 bg-white/5">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Status history</CardTitle>
-                    <CardDescription>Recent status changes.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {selectedTicket.statusHistory.map((entry) => (
-                        <div
-                          key={entry.id}
-                          className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-zinc-400"
-                        >
-                          <div>
-                            <p className="text-sm text-zinc-200">
-                              {entry.fromStatus
-                                ? statusLabels[entry.fromStatus]
-                                : "New"}{" "}
-                              → {statusLabels[entry.toStatus]}
-                            </p>
-                            <p className="text-xs text-zinc-500">
-                              {formatUserName(entry.changedByUser)}
-                            </p>
-                          </div>
-                          <span>{formatDateTime(entry.changedAt)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : null}
-            </>
-          )}
+      {/* ── Search + Filter Bar ── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search tickets by title…"
+            className="h-10 w-full rounded-2xl border border-white/10 bg-white/5 pl-10 pr-4 text-sm text-zinc-50 outline-none transition placeholder:text-zinc-500 hover:border-white/20 focus:border-white/30 focus:ring-2 focus:ring-white/20"
+          />
         </div>
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {Object.entries(statusLabels).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterPriority} onValueChange={setFilterPriority}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="All priorities" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All priorities</SelectItem>
+            {Object.entries(priorityLabels).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
+      {/* ── Ticket Table ── */}
+      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+        {isLoading ? (
+          // Skeleton loading state
+          <div className="divide-y divide-white/[0.06]">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex animate-pulse items-center gap-4 px-6 py-4">
+                <div className="h-4 w-8 rounded bg-white/10" />
+                <div className="h-4 flex-1 rounded bg-white/10" />
+                <div className="h-4 w-20 rounded bg-white/10" />
+                <div className="h-4 w-20 rounded bg-white/10" />
+                <div className="h-4 w-24 rounded bg-white/10" />
+                <div className="h-4 w-28 rounded bg-white/10" />
+                <div className="h-4 w-16 rounded bg-white/10" />
+              </div>
+            ))}
+          </div>
+        ) : ticketListEmpty ? (
+          // Empty state
+          <div className="flex flex-col items-center justify-center gap-3 px-6 py-16">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+              <Search className="h-5 w-5 text-zinc-500" />
+            </div>
+            <p className="text-sm text-zinc-400">
+              No tickets found. Create your first request.
+            </p>
+          </div>
+        ) : filteredTickets.length === 0 ? (
+          // No results from search/filter
+          <div className="flex flex-col items-center justify-center gap-3 px-6 py-16">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+              <Search className="h-5 w-5 text-zinc-500" />
+            </div>
+            <p className="text-sm text-zinc-400">
+              No tickets match your search criteria.
+            </p>
+          </div>
+        ) : (
+          // Table
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/[0.06]">
+                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    #
+                  </th>
+                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    Title
+                  </th>
+                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    Category
+                  </th>
+                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    Priority
+                  </th>
+                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    Status
+                  </th>
+                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    Created
+                  </th>
+                  <th className="px-6 py-3.5 text-right text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    Comments / Files
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.06]">
+                {filteredTickets.map((ticket, index) => (
+                  <tr
+                    key={ticket.id}
+                    onClick={() => handleRowClick(ticket.id)}
+                    className="cursor-pointer transition-colors duration-150 hover:bg-white/5"
+                  >
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-zinc-500">
+                      {String(index + 1).padStart(2, "0")}
+                    </td>
+                    <td className="max-w-[280px] px-6 py-4">
+                      <p className="truncate text-sm font-medium text-zinc-100">
+                        {ticket.title}
+                      </p>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-zinc-400">
+                      {ticket.category?.name || "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
+                          priorityStyles[ticket.priority],
+                        )}
+                      >
+                        {priorityLabels[ticket.priority]}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
+                          statusStyles[ticket.status],
+                        )}
+                      >
+                        {statusLabels[ticket.status]}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-zinc-400">
+                      {formatDateTime(ticket.createdAt)}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-right text-sm text-zinc-500">
+                      {ticket._count?.comments ?? 0} /{" "}
+                      {ticket._count?.attachments ?? 0}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Ticket Detail Modal ── */}
+      {isModalOpen && typeof window !== "undefined"
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/80 backdrop-blur-xl"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleCloseModal();
+          }}
+        >
+          <div className="mx-4 my-6 w-full max-w-3xl sm:mx-auto">
+            <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-3xl border border-white/10 bg-zinc-900/95 shadow-2xl backdrop-blur-xl">
+              {/* Modal Header */}
+              <div className="flex items-start justify-between border-b border-white/[0.06] px-6 py-5">
+                <div className="min-w-0 flex-1">
+                  {isDetailLoading ? (
+                    <div className="flex items-center gap-3">
+                      <Loader className="h-5 w-5 animate-spin text-zinc-400" />
+                      <p className="text-sm text-zinc-400">Loading ticket details…</p>
+                    </div>
+                  ) : detailError ? (
+                    <div className="flex items-center gap-3">
+                      <AlertCircle className="h-5 w-5 shrink-0 text-rose-400" />
+                      <p className="text-sm text-rose-200">{detailError}</p>
+                    </div>
+                  ) : selectedTicket ? (
+                    <>
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-xl font-semibold tracking-tight text-white">
+                          {selectedTicket.title}
+                        </h2>
+                        <span
+                          className={cn(
+                            "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
+                            statusStyles[selectedTicket.status],
+                          )}
+                        >
+                          {statusLabels[selectedTicket.status]}
+                        </span>
+                        <span
+                          className={cn(
+                            "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
+                            priorityStyles[selectedTicket.priority],
+                          )}
+                        >
+                          {priorityLabels[selectedTicket.priority]}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        ID: {selectedTicket.id}
+                      </p>
+                    </>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="ml-4 shrink-0 rounded-full p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Tab Bar */}
+              <div className="flex gap-0 border-b border-white/[0.06] px-6">
+                {([
+                  { id: "details" as const, label: "Details" },
+                  { id: "attachments" as const, label: "Attachments" },
+                  { id: "comments" as const, label: "Comments" },
+                ]).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    className={cn(
+                      "relative px-4 py-3 text-sm font-medium transition-colors",
+                      activeTab === tab.id
+                        ? "text-white"
+                        : "text-zinc-400 hover:text-zinc-200",
+                    )}
+                  >
+                    {tab.label}
+                    {activeTab === tab.id ? (
+                      <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-white" />
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto p-6">
+                {isDetailLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader className="h-6 w-6 animate-spin text-zinc-400" />
+                  </div>
+                ) : detailError ? (
+                  <div className="flex items-center gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4">
+                    <AlertCircle className="h-5 w-5 shrink-0 text-rose-400" />
+                    <p className="text-sm text-rose-200">{detailError}</p>
+                  </div>
+                ) : !selectedTicket ? (
+                  <div className="py-12 text-center text-sm text-zinc-500">
+                    No ticket selected.
+                  </div>
+                ) : (
+                  <>
+                    {/* ── Details Tab ── */}
+                    {activeTab === "details" ? (
+                      <div className="space-y-6">
+                        {/* Description */}
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                          <p className="mb-2 text-[10px] uppercase tracking-widest text-zinc-500">
+                            Description
+                          </p>
+                          <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-200">
+                            {selectedTicket.description}
+                          </p>
+                        </div>
+
+                        {/* Metadata Grid */}
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <MetadataItem
+                            label="Category"
+                            value={selectedTicket.category?.name || "—"}
+                          />
+                          <MetadataItem
+                            label="Asset"
+                            value={selectedTicket.asset?.deviceType || "—"}
+                          />
+                          <MetadataItem
+                            label="Assigned to"
+                            value={formatUserName(selectedTicket.assignedToUser)}
+                          />
+                          <MetadataItem
+                            label="Created"
+                            value={formatDateTime(selectedTicket.createdAt)}
+                          />
+                          <MetadataItem
+                            label="Updated"
+                            value={formatDateTime(selectedTicket.updatedAt)}
+                          />
+                          <MetadataItem
+                            label="Acknowledged"
+                            value={formatDateTime(selectedTicket.acknowledgedAt)}
+                          />
+                        </div>
+
+                        {/* Status History */}
+                        {selectedTicket.statusHistory &&
+                        selectedTicket.statusHistory.length > 0 ? (
+                          <div className="space-y-3">
+                            <p className="text-[10px] uppercase tracking-widest text-zinc-500">
+                              Status History
+                            </p>
+                            <div className="space-y-1.5">
+                              {selectedTicket.statusHistory.map((entry) => (
+                                <div
+                                  key={entry.id}
+                                  className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-zinc-500">
+                                      {entry.fromStatus
+                                        ? statusLabels[entry.fromStatus]
+                                        : "New"}
+                                    </span>
+                                    <span className="text-zinc-600">→</span>
+                                    <span className="font-medium text-zinc-200">
+                                      {statusLabels[entry.toStatus]}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-3 text-xs text-zinc-500">
+                                    <span>
+                                      {formatUserName(entry.changedByUser)}
+                                    </span>
+                                    <span>
+                                      {formatDateTime(entry.changedAt)}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {/* ── Attachments Tab ── */}
+                    {activeTab === "attachments" ? (
+                      <div className="space-y-5">
+                        {/* Upload Input */}
+                        <div className="space-y-2">
+                          <Label htmlFor="ticket-attachments">
+                            Upload files
+                          </Label>
+                          <input
+                            id="ticket-attachments"
+                            ref={ticketFileInputRef}
+                            type="file"
+                            multiple
+                            accept={ACCEPTED_FILE_TYPES}
+                            onChange={(event) =>
+                              void handleTicketFilesChange(event.target.files)
+                            }
+                            className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-xl file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
+                          />
+                          <p className="text-xs text-zinc-500">
+                            Max 10MB per file. Images, PDF, docs, spreadsheets,
+                            text, and archives supported.
+                          </p>
+                        </div>
+
+                        {/* Upload Queue */}
+                        {uploadQueue.length > 0 ? (
+                          <div className="space-y-2">
+                            <p className="text-[10px] uppercase tracking-widest text-zinc-500">
+                              Uploads
+                            </p>
+                            {uploadQueue.map((item) => (
+                              <div
+                                key={item.id}
+                                className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300"
+                              >
+                                <span className="truncate">
+                                  {item.fileName}
+                                </span>
+                                <span
+                                  className={cn(
+                                    "rounded-full px-2 py-0.5 text-[10px] uppercase",
+                                    item.status === "completed"
+                                      ? "bg-emerald-500/10 text-emerald-200"
+                                      : item.status === "failed"
+                                        ? "bg-rose-500/10 text-rose-200"
+                                        : "bg-white/10 text-zinc-200",
+                                  )}
+                                >
+                                  {item.status}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        {/* Attachment List */}
+                        {ticketAttachments.length === 0 ? (
+                          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-zinc-500">
+                            No attachments yet.
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <p className="text-[10px] uppercase tracking-widest text-zinc-500">
+                              {ticketAttachments.length} attachment
+                              {ticketAttachments.length !== 1 ? "s" : ""}
+                            </p>
+                            {ticketAttachments.map((attachment) => (
+                              <div
+                                key={attachment.id}
+                                className="overflow-hidden rounded-2xl border border-white/10 bg-white/5"
+                              >
+                                {/* Image preview */}
+                                {attachment.fileType?.startsWith("image/") ? (
+                                  <div className="border-b border-white/10 bg-white/[0.02] p-3">
+                                    <AttachmentImage attachment={attachment} />
+                                  </div>
+                                ) : null}
+
+                                {/* File info row */}
+                                <div className="flex items-center justify-between px-4 py-3">
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm text-zinc-100">
+                                      {attachment.fileName}
+                                    </p>
+                                    <p className="text-xs text-zinc-500">
+                                      {formatFileSize(
+                                        attachment.fileSizeBytes,
+                                      )}{" "}
+                                      · {formatDateTime(attachment.createdAt)}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleDownloadAttachment(attachment)
+                                      }
+                                      className="rounded-full border border-white/10 p-2 text-zinc-300 transition hover:border-white/30 hover:text-white"
+                                    >
+                                      <Download className="h-4 w-4" />
+                                    </button>
+                                    {attachment.uploadedByUserId ===
+                                    currentUserId ? (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleDeleteAttachment(attachment)
+                                        }
+                                        className="rounded-full border border-rose-500/30 p-2 text-rose-300 transition hover:border-rose-400/60 hover:text-rose-100"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+
+                    {/* ── Comments Tab ── */}
+                    {activeTab === "comments" ? (
+                      <div className="space-y-5">
+                        {/* Comment List */}
+                        {selectedTicket.comments &&
+                        selectedTicket.comments.length > 0 ? (
+                          <div className="space-y-3">
+                            <p className="text-[10px] uppercase tracking-widest text-zinc-500">
+                              {selectedTicket.comments.length} comment
+                              {selectedTicket.comments.length !== 1
+                                ? "s"
+                                : ""}
+                            </p>
+                            {selectedTicket.comments.map((comment) => (
+                              <div
+                                key={comment.id}
+                                className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                              >
+                                <div className="flex items-center justify-between text-xs text-zinc-500">
+                                  <span className="font-medium text-zinc-300">
+                                    {formatUserName(comment.authorUser)}
+                                  </span>
+                                  <span>
+                                    {formatDateTime(comment.createdAt)}
+                                  </span>
+                                </div>
+                                <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-zinc-200">
+                                  {comment.body}
+                                </p>
+
+                                {/* Comment Attachments */}
+                                {comment.attachments &&
+                                comment.attachments.length > 0 ? (
+                                  <div className="mt-3 space-y-2">
+                                    {comment.attachments.map((attachment) => (
+                                      <div
+                                        key={attachment.id}
+                                        className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]"
+                                      >
+                                        {attachment.fileType?.startsWith(
+                                          "image/",
+                                        ) ? (
+                                          <div className="border-b border-white/10 bg-white/[0.02] p-2">
+                                            <AttachmentImage
+                                              attachment={attachment}
+                                            />
+                                          </div>
+                                        ) : null}
+                                        <div className="flex items-center justify-between px-3 py-2">
+                                          <div className="min-w-0">
+                                            <p className="truncate text-xs text-zinc-100">
+                                              {attachment.fileName}
+                                            </p>
+                                            <p className="text-[10px] text-zinc-500">
+                                              {formatFileSize(
+                                                attachment.fileSizeBytes,
+                                              )}{" "}
+                                              ·{" "}
+                                              {formatDateTime(
+                                                attachment.createdAt,
+                                              )}
+                                            </p>
+                                          </div>
+                                          <div className="flex items-center gap-1">
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                handleDownloadAttachment(
+                                                  attachment,
+                                                )
+                                              }
+                                              className="rounded-full border border-white/10 p-1.5 text-zinc-300 transition hover:border-white/30 hover:text-white"
+                                            >
+                                              <Download className="h-3.5 w-3.5" />
+                                            </button>
+                                            {attachment.uploadedByUserId ===
+                                            currentUserId ? (
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  handleDeleteAttachment(
+                                                    attachment,
+                                                  )
+                                                }
+                                                className="rounded-full border border-rose-500/30 p-1.5 text-rose-300 transition hover:border-rose-400/60 hover:text-rose-100"
+                                              >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                              </button>
+                                            ) : null}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-zinc-500">
+                            No comments yet.
+                          </div>
+                        )}
+
+                        {/* Add Comment Form */}
+                        <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+                          <Label>Add a comment</Label>
+                          <Textarea
+                            value={commentBody}
+                            onChange={(event) =>
+                              setCommentBody(event.target.value)
+                            }
+                            placeholder="Share an update, question, or clarification"
+                            rows={3}
+                          />
+                          <input
+                            ref={commentFileInputRef}
+                            type="file"
+                            multiple
+                            accept={ACCEPTED_FILE_TYPES}
+                            onChange={(event) =>
+                              setCommentFiles(event.target.files)
+                            }
+                            className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-xl file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
+                          />
+                          {commentError ? (
+                            <p className="text-sm text-rose-400">
+                              {commentError}
+                            </p>
+                          ) : null}
+                          <div className="flex justify-end">
+                            <Button
+                              className="h-10"
+                              onClick={() => void handleCommentSubmit()}
+                              disabled={isCommentSubmitting}
+                            >
+                              {isCommentSubmitting ? (
+                                <Loader className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <FileUp className="mr-2 h-4 w-4" />
+                              )}
+                              Add comment
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            </div>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null}
+
+      {/* ── Create Ticket Modal ── */}
       <TicketCreateModal
         open={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
@@ -958,62 +1285,13 @@ export default function ClientTicketsPage() {
   );
 }
 
-function DetailItem({ label, value }: { label: string; value: string }) {
+function MetadataItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-      <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
+      <p className="text-[10px] uppercase tracking-widest text-zinc-500">
         {label}
       </p>
-      <p className="mt-2 text-sm text-zinc-100">{value}</p>
-    </div>
-  );
-}
-
-function AttachmentRow({
-  attachment,
-  onDownload,
-  onDelete,
-  canDelete,
-  compact,
-}: {
-  attachment: TicketAttachment;
-  onDownload: (attachment: TicketAttachment) => void;
-  onDelete: (attachment: TicketAttachment) => void;
-  canDelete: boolean;
-  compact?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3",
-        compact && "px-3 py-2",
-      )}
-    >
-      <div className="min-w-0">
-        <p className="truncate text-sm text-zinc-100">{attachment.fileName}</p>
-        <p className="text-xs text-zinc-500">
-          {formatFileSize(attachment.fileSizeBytes)} ·{" "}
-          {formatDateTime(attachment.createdAt)}
-        </p>
-      </div>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onDownload(attachment)}
-          className="rounded-full border border-white/10 p-2 text-zinc-300 transition hover:border-white/30 hover:text-white"
-        >
-          <Download className="h-4 w-4" />
-        </button>
-        {canDelete ? (
-          <button
-            type="button"
-            onClick={() => onDelete(attachment)}
-            className="rounded-full border border-rose-500/30 p-2 text-rose-300 transition hover:border-rose-400/60 hover:text-rose-100"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        ) : null}
-      </div>
+      <p className="mt-1.5 text-sm text-zinc-100">{value}</p>
     </div>
   );
 }

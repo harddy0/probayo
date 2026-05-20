@@ -4,6 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast-provider";
 import { isApiError } from "@/lib/api/client";
@@ -45,10 +52,10 @@ type FormState = {
 const emptyFormState: FormState = {
   title: "",
   description: "",
-  categoryId: "",
-  assetId: "",
+  categoryId: "__none__",
+  assetId: "__none__",
   priority: "Medium",
-  knownIssueId: "",
+  knownIssueId: "__none__",
 };
 
 const formatAssetLabel = (asset: Asset) => {
@@ -96,7 +103,7 @@ export default function TicketCreateModal({
       setError("Description is required.");
       return;
     }
-    if (!formState.categoryId) {
+    if (!formState.categoryId || formState.categoryId === "__none__") {
       setError("Category is required.");
       return;
     }
@@ -108,11 +115,11 @@ export default function TicketCreateModal({
       priority: formState.priority,
     };
 
-    if (formState.assetId) {
+    if (formState.assetId && formState.assetId !== "__none__") {
       payload.assetId = formState.assetId;
     }
 
-    if (formState.knownIssueId) {
+    if (formState.knownIssueId && formState.knownIssueId !== "__none__") {
       payload.knownIssueId = formState.knownIssueId;
     }
 
@@ -145,13 +152,13 @@ export default function TicketCreateModal({
       confirmLabel="Create ticket"
       loading={isSubmitting}
     >
-      <div className="space-y-5">
-        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-zinc-400">
+      <div className="space-y-3">
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-3.5 py-2.5 text-xs leading-relaxed text-amber-200">
           Attachments can be added after the ticket is created.
         </div>
 
-        <div className="space-y-2">
-          <Label>Title</Label>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium text-zinc-300">Title</Label>
           <Input
             placeholder="Short summary of the issue"
             value={formState.title}
@@ -164,8 +171,8 @@ export default function TicketCreateModal({
           />
         </div>
 
-        <div className="space-y-2">
-          <Label>Description</Label>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium text-zinc-300">Description</Label>
           <Textarea
             placeholder="Describe what happened and what you need help with"
             value={formState.description}
@@ -175,29 +182,30 @@ export default function TicketCreateModal({
                 description: event.target.value,
               }))
             }
-            rows={5}
+            rows={3}
           />
         </div>
 
-        <div className="space-y-2">
-          <Label>Category</Label>
-          <select
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium text-zinc-300">Category</Label>
+          <Select
             value={formState.categoryId}
-            onChange={(event) =>
-              setFormState((current) => ({
-                ...current,
-                categoryId: event.target.value,
-              }))
+            onValueChange={(value) =>
+              setFormState((current) => ({ ...current, categoryId: value }))
             }
-            className="flex h-12 w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-zinc-50 outline-none transition hover:border-white/20 focus:border-white/30 focus:ring-2 focus:ring-white/10"
           >
-            <option value="">Select a category</option>
-            {categoryOptions.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger>
+              <SelectValue placeholder="Select a category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Select a category</SelectItem>
+              {categoryOptions.map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {categoryOptions.length === 0 ? (
             <p className="text-xs text-amber-300">
               No active categories available yet.
@@ -205,51 +213,56 @@ export default function TicketCreateModal({
           ) : null}
         </div>
 
-        <div className="space-y-2">
-          <Label>Priority</Label>
-          <select
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium text-zinc-300">Priority</Label>
+          <Select
             value={formState.priority}
-            onChange={(event) =>
+            onValueChange={(value) =>
               setFormState((current) => ({
                 ...current,
-                priority: event.target.value as TicketPriority,
+                priority: value as TicketPriority,
               }))
             }
-            className="flex h-12 w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-zinc-50 outline-none transition hover:border-white/20 focus:border-white/30 focus:ring-2 focus:ring-white/10"
           >
-            {priorityOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger>
+              <SelectValue placeholder="Select priority" />
+            </SelectTrigger>
+            <SelectContent>
+              {priorityOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {formState.priority === "Critical" ? (
-            <p className="text-xs text-amber-300">
+            <p className="text-xs text-amber-300/80">
               Critical means it is serious and should not be selected for small
               issues.
             </p>
           ) : null}
         </div>
 
-        <div className="space-y-2">
-          <Label>Related asset (optional)</Label>
-          <select
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium text-zinc-300">Related asset <span className="text-zinc-500">(optional)</span></Label>
+          <Select
             value={formState.assetId}
-            onChange={(event) =>
-              setFormState((current) => ({
-                ...current,
-                assetId: event.target.value,
-              }))
+            onValueChange={(value) =>
+              setFormState((current) => ({ ...current, assetId: value }))
             }
-            className="flex h-12 w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-zinc-50 outline-none transition hover:border-white/20 focus:border-white/30 focus:ring-2 focus:ring-white/10"
           >
-            <option value="">No asset linked</option>
-            {assets.map((asset) => (
-              <option key={asset.id} value={asset.id}>
-                {formatAssetLabel(asset)}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger>
+              <SelectValue placeholder="No asset linked" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">No asset linked</SelectItem>
+              {assets.map((asset) => (
+                <SelectItem key={asset.id} value={asset.id}>
+                  {formatAssetLabel(asset)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {assets.length === 0 ? (
             <p className="text-xs text-zinc-500">
               No assigned assets available.
@@ -257,25 +270,26 @@ export default function TicketCreateModal({
           ) : null}
         </div>
 
-        <div className="space-y-2">
-          <Label>Known issue (optional)</Label>
-          <select
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium text-zinc-300">Known issue <span className="text-zinc-500">(optional)</span></Label>
+          <Select
             value={formState.knownIssueId}
-            onChange={(event) =>
-              setFormState((current) => ({
-                ...current,
-                knownIssueId: event.target.value,
-              }))
+            onValueChange={(value) =>
+              setFormState((current) => ({ ...current, knownIssueId: value }))
             }
-            className="flex h-12 w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-zinc-50 outline-none transition hover:border-white/20 focus:border-white/30 focus:ring-2 focus:ring-white/10"
           >
-            <option value="">No known issue</option>
-            {knownIssues.map((issue) => (
-              <option key={issue.id} value={issue.id}>
-                {issue.title}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger>
+              <SelectValue placeholder="No known issue" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">No known issue</SelectItem>
+              {knownIssues.map((issue) => (
+                <SelectItem key={issue.id} value={issue.id}>
+                  {issue.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {knownIssues.length > 0 ? (
             <p className="text-xs text-zinc-500">
               Review active known issues before submitting.
@@ -283,7 +297,11 @@ export default function TicketCreateModal({
           ) : null}
         </div>
 
-        {error ? <p className="text-sm text-rose-400">{error}</p> : null}
+        {error ? (
+          <div className="flex items-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3.5 py-2.5">
+            <p className="text-xs text-rose-200">{error}</p>
+          </div>
+        ) : null}
       </div>
     </Modal>
   );
