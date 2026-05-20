@@ -10,6 +10,7 @@ import {
   LogOut,
   Building2,
   HardDrive,
+  Tags,
   UserRound,
 } from "lucide-react";
 import { logout } from "@/lib/api/auth";
@@ -133,6 +134,26 @@ export default function AdminLayout({
                 )}
               >
                 Departments
+              </span>
+            </Link>
+
+            <Link
+              href="/admin/ticket-categories"
+              className={cn(
+                "group relative flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition",
+                pathname === "/admin/ticket-categories"
+                  ? "bg-white/10 text-white"
+                  : "text-zinc-400 hover:bg-white/5",
+              )}
+            >
+              <Tags className="h-5 w-5 shrink-0" />
+              <span
+                className={cn(
+                  "transition-all duration-300",
+                  isCollapsed && "w-0 overflow-hidden",
+                )}
+              >
+                Ticket Categories
               </span>
             </Link>
 

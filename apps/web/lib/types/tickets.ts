@@ -6,6 +6,19 @@
 
 import type { Asset } from "./assets";
 
+// ── Re-exports from feature-based modules ──
+export type {
+  TicketCategory,
+  TicketCategoryCreateRequest,
+  TicketCategoryUpdateRequest,
+} from "./ticket-categories";
+
+export type {
+  KnownIssueStatus,
+  KnownIssue,
+  BulkAttachKnownIssueRequest,
+} from "./known-issues";
+
 export type TicketPriority = "Critical" | "High" | "Medium" | "Low";
 
 export type TicketStatus =
@@ -27,28 +40,6 @@ export type TicketDepartment = {
   id: string;
   name: string;
   headUserId?: string | null;
-};
-
-export type TicketCategory = {
-  id: string;
-  name: string;
-  description?: string | null;
-  isActive?: boolean;
-  deletedAt?: string | null;
-  ticketCount?: number;
-};
-
-export type KnownIssueStatus = "active" | "resolved";
-
-export type KnownIssue = {
-  id: string;
-  title: string;
-  description: string;
-  createdByUserId: string;
-  status: KnownIssueStatus;
-  resolvedAt?: string | null;
-  createdAt: string;
-  deletedAt?: string | null;
 };
 
 export type TicketStatusHistory = {
@@ -185,21 +176,4 @@ export type AttachmentJobStatus = {
   progress?: number | Record<string, unknown>;
   result?: unknown;
   failedReason?: string | null;
-};
-
-export type TicketCategoryCreateRequest = {
-  name: string;
-  description?: string;
-  isActive?: boolean;
-};
-
-export type TicketCategoryUpdateRequest = {
-  name?: string;
-  description?: string | null;
-  isActive?: boolean;
-};
-
-export type BulkAttachKnownIssueRequest = {
-  ticketIds: string[];
-  knownIssueId: string;
 };

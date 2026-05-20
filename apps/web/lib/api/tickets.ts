@@ -8,14 +8,9 @@ import { request, requestFormData, requestRaw } from "./client";
 import type {
   AttachmentJobStatus,
   AttachmentUploadResponse,
-  BulkAttachKnownIssueRequest,
   CreateTicketRequest,
-  KnownIssue,
   Ticket,
   TicketAttachment,
-  TicketCategory,
-  TicketCategoryCreateRequest,
-  TicketCategoryUpdateRequest,
   TicketComment,
   TicketCommentCreateRequest,
   TicketCommentUpdateRequest,
@@ -23,6 +18,25 @@ import type {
   TicketListResponse,
   UpdateTicketRequest,
 } from "../types/tickets";
+
+// ── Re-exports from feature-based modules ──
+export {
+  fetchTicketCategories,
+  createTicketCategory,
+  updateTicketCategory,
+  deleteTicketCategory,
+} from "./ticket-categories";
+
+export {
+  fetchKnownIssues,
+  fetchActiveKnownIssues,
+  createKnownIssue,
+  updateKnownIssue,
+  deleteKnownIssue,
+  resolveKnownIssue,
+  bulkAttachKnownIssue,
+  createAndAttachKnownIssue,
+} from "./known-issues";
 
 export type AttachmentDownload = {
   blob: Blob;
@@ -55,18 +69,6 @@ const buildTicketQuery = (filters?: TicketListFilters) => {
   if (filters.unassigned) {
     params.set("assignedToUserId", "");
   }
-
-  const query = params.toString();
-  return query ? `?${query}` : "";
-};
-
-const buildCategoryQuery = (includeInactive?: boolean) => {
-  if (!includeInactive) {
-    return "";
-  }
-
-  const params = new URLSearchParams();
-  params.set("includeInactive", "true");
 
   const query = params.toString();
   return query ? `?${query}` : "";
@@ -247,50 +249,5 @@ export const downloadAttachment = async (
 export const deleteAttachment = async (attachmentId: string): Promise<void> => {
   await request<void>(`/attachments/${attachmentId}`, {
     method: "DELETE",
-  });
-};
-
-export const fetchTicketCategories = async (
-  includeInactive?: boolean,
-): Promise<TicketCategory[]> => {
-  const query = buildCategoryQuery(includeInactive);
-  return request<TicketCategory[]>(`/ticket-categories${query}`);
-};
-
-export const createTicketCategory = async (
-  data: TicketCategoryCreateRequest,
-): Promise<TicketCategory> => {
-  return request<TicketCategory>("/ticket-categories", {
-    method: "POST",
-    body: data,
-  });
-};
-
-export const updateTicketCategory = async (
-  id: string,
-  data: TicketCategoryUpdateRequest,
-): Promise<TicketCategory> => {
-  return request<TicketCategory>(`/ticket-categories/${id}`, {
-    method: "PATCH",
-    body: data,
-  });
-};
-
-export const deleteTicketCategory = async (id: string): Promise<void> => {
-  await request<void>(`/ticket-categories/${id}`, {
-    method: "DELETE",
-  });
-};
-
-export const fetchActiveKnownIssues = async (): Promise<KnownIssue[]> => {
-  return request<KnownIssue[]>("/known-issues/active");
-};
-
-export const bulkAttachKnownIssue = async (
-  data: BulkAttachKnownIssueRequest,
-): Promise<void> => {
-  await request<void>("/tickets/bulk-attach-issue", {
-    method: "POST",
-    body: data,
   });
 };
