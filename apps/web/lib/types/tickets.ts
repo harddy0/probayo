@@ -130,6 +130,8 @@ export type TicketListFilters = {
   assignedToUserId?: string;
   departmentId?: string;
   categoryId?: string;
+  /** Filter for tickets that have no assignee (unclaimed) */
+  unassigned?: boolean;
 };
 
 export type TicketListResponse = Ticket[];

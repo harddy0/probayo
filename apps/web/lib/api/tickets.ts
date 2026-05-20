@@ -52,6 +52,9 @@ const buildTicketQuery = (filters?: TicketListFilters) => {
   if (filters.categoryId) {
     params.set("categoryId", filters.categoryId);
   }
+  if (filters.unassigned) {
+    params.set("assignedToUserId", "");
+  }
 
   const query = params.toString();
   return query ? `?${query}` : "";

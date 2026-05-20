@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, HardDrive, LayoutDashboard, LogOut, User } from "lucide-react";
+import { Bell, ChevronLeft, ChevronRight, HardDrive, LayoutDashboard, LogOut, TicketCheck, User } from "lucide-react";
 import { logout } from "@/lib/api/auth";
 import { getAuthSession } from "@/lib/api/client";
+import { fetchUnreadCount } from "@/lib/api/notifications";
+import NotificationBellDropdown from "@/components/it-staff/notification-bell-dropdown";
 import { cn } from "@/lib/utils";
 
 export default function ItStaffLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -13,6 +15,8 @@ export default function ItStaffLayout({ children }: Readonly<{ children: React.R
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number | null>(null);
+  const mountedRef = useRef(false);
 
   useEffect(() => {
     const session = getAuthSession();
@@ -25,6 +29,9 @@ export default function ItStaffLayout({ children }: Readonly<{ children: React.R
     const role = String(session.identity.role || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
     if (role === "itstaff") {
       setIsAuthorized(true);
+      fetchUnreadCount()
+        .then((count) => { if (mountedRef.current) setUnreadCount(count); })
+        .catch(() => { /* ignore */ });
     } else {
       const roleRedirects: Record<string, string> = {
         admin: "/admin/dashboard",
@@ -34,6 +41,11 @@ export default function ItStaffLayout({ children }: Readonly<{ children: React.R
       router.replace(roleRedirects[role] ?? "/client/dashboard");
     }
   }, [router]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // Render a lightweight placeholder while client-side session validation runs
   if (!isAuthorized) {
@@ -88,6 +100,38 @@ export default function ItStaffLayout({ children }: Readonly<{ children: React.R
             </Link>
 
             <Link
+              href="/it-staff/tickets"
+              className={cn(
+                "group relative flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition",
+                pathname.startsWith("/it-staff/tickets") ? "bg-white/10 text-white" : "text-zinc-400 hover:bg-white/5",
+              )}
+            >
+              <TicketCheck className="h-5 w-5 shrink-0" />
+              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>Tickets</span>
+            </Link>
+
+            <div className="relative">
+              <Link
+                href="/it-staff/notifications"
+                className={cn(
+                  "group relative flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition",
+                  pathname.startsWith("/it-staff/notifications") ? "bg-white/10 text-white" : "text-zinc-400 hover:bg-white/5",
+                )}
+              >
+                <Bell className="h-5 w-5 shrink-0" />
+                <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>Notifications</span>
+                {unreadCount !== null && unreadCount > 0 ? (
+                  <span className={cn(
+                    "ml-auto inline-flex items-center justify-center rounded-full bg-rose-500/90 px-1.5 py-0.5 text-[10px] font-bold text-white",
+                    isCollapsed && "absolute -right-1 -top-1",
+                  )}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                ) : null}
+              </Link>
+            </div>
+
+            <Link
               href="/it-staff/profile"
               className={cn(
                 "group relative flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition",
@@ -138,7 +182,11 @@ export default function ItStaffLayout({ children }: Readonly<{ children: React.R
         "relative z-10 h-screen overflow-hidden transition-[margin-left] duration-300",
         isCollapsed ? "ml-20" : "ml-64",
       )}>
-        <div className="h-full overflow-y-auto">
+        {/* Top header bar */}
+        <div className="flex h-14 items-center justify-end border-b border-white/10 bg-white/[0.02] px-6">
+          <NotificationBellDropdown />
+        </div>
+        <div className="h-[calc(100vh-3.5rem)] overflow-y-auto">
           <div className="px-6 py-6 sm:px-8">
             {children}
           </div>
