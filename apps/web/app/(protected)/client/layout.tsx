@@ -8,6 +8,7 @@ import {
   ChevronRight,
   LayoutDashboard,
   LogOut,
+  Ticket,
   UserRound,
 } from "lucide-react";
 import { logout } from "@/lib/api/auth";
@@ -32,7 +33,10 @@ export default function ClientLayout({
     }
 
     // Normalize role to be resilient to casing/spacing and punctuation differences.
-    const role = String(session.identity.role || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    const role = String(session.identity.role || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
     if (role === "admin") {
       // Admin users should access admin dashboard instead
       router.replace("/admin/dashboard");
@@ -105,8 +109,33 @@ export default function ClientLayout({
               )}
             >
               <LayoutDashboard className="h-5 w-5 shrink-0" />
-              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>
+              <span
+                className={cn(
+                  "transition-all duration-300",
+                  isCollapsed && "w-0 overflow-hidden",
+                )}
+              >
                 Dashboard
+              </span>
+            </Link>
+
+            <Link
+              href="/client/tickets"
+              className={cn(
+                "group relative flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition",
+                pathname === "/client/tickets"
+                  ? "bg-white/10 text-white"
+                  : "text-zinc-400 hover:bg-white/5",
+              )}
+            >
+              <Ticket className="h-5 w-5 shrink-0" />
+              <span
+                className={cn(
+                  "transition-all duration-300",
+                  isCollapsed && "w-0 overflow-hidden",
+                )}
+              >
+                Tickets
               </span>
             </Link>
 
@@ -120,7 +149,12 @@ export default function ClientLayout({
               )}
             >
               <UserRound className="h-5 w-5 shrink-0" />
-              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>
+              <span
+                className={cn(
+                  "transition-all duration-300",
+                  isCollapsed && "w-0 overflow-hidden",
+                )}
+              >
                 Profile
               </span>
             </Link>
@@ -136,7 +170,12 @@ export default function ClientLayout({
               ) : (
                 <ChevronLeft className="h-5 w-5 shrink-0" />
               )}
-              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>
+              <span
+                className={cn(
+                  "transition-all duration-300",
+                  isCollapsed && "w-0 overflow-hidden",
+                )}
+              >
                 Collapse
               </span>
             </button>
@@ -146,7 +185,12 @@ export default function ClientLayout({
               className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold text-zinc-400 transition hover:bg-white/5"
             >
               <LogOut className="h-5 w-5 shrink-0" />
-              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>
+              <span
+                className={cn(
+                  "transition-all duration-300",
+                  isCollapsed && "w-0 overflow-hidden",
+                )}
+              >
                 Logout
               </span>
             </button>
@@ -154,14 +198,14 @@ export default function ClientLayout({
         </div>
       </aside>
 
-      <main className={cn(
-        "relative z-10 h-screen overflow-hidden transition-[margin-left] duration-300",
-        isCollapsed ? "ml-20" : "ml-64",
-      )}>
+      <main
+        className={cn(
+          "relative z-10 h-screen overflow-hidden transition-[margin-left] duration-300",
+          isCollapsed ? "ml-20" : "ml-64",
+        )}
+      >
         <div className="h-full overflow-y-auto">
-          <div className="px-6 py-6 sm:px-8">
-            {children}
-          </div>
+          <div className="px-6 py-6 sm:px-8">{children}</div>
         </div>
       </main>
     </div>

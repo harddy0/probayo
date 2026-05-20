@@ -1,167 +1,173 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  BadgeCheck,
+  Building2,
+  CircleUserRound,
+  IdCard,
+  Mail,
+  Pencil,
+  Shield,
+} from "lucide-react";
 import { fetchProfile } from "@/lib/api/auth";
-import { Mail, User, Shield, Calendar, Loader, Pencil } from "lucide-react";
 import type { UserProfile } from "@/lib/types/auth";
 import {
   Card,
+  CardDescription,
   CardHeader,
   CardTitle,
-  CardDescription,
-  CardContent,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import EditProfileModal from "@/components/profile/edit-profile-modal";
 
-export default function ItStaffProfile() {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+type ProfileState = {
+  data: UserProfile | null;
+  error: string | null;
+  isLoading: boolean;
+};
+
+export default function ItStaffProfilePage() {
+  const [state, setState] = useState<ProfileState>({
+    data: null,
+    error: null,
+    isLoading: true,
+  });
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     const loadProfile = async () => {
       try {
-        setIsLoading(true);
         const data = await fetchProfile();
-        setProfile(data);
-      } catch (err) {
-        setError("Failed to load profile");
-        console.error(err);
-      } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setState({ data, error: null, isLoading: false });
+        }
+      } catch (error) {
+        if (isMounted) {
+          const message =
+            error instanceof Error ? error.message : "Failed to load profile.";
+          setState({ data: null, error: message, isLoading: false });
+        }
       }
     };
 
     loadProfile();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-8">
-        <div className="flex items-center gap-3">
-          <Loader className="h-6 w-6 animate-spin text-zinc-400" />
-          <p className="text-zinc-400">Loading profile...</p>
-        </div>
-      </div>
-    );
+  if (state.isLoading) {
+    return <p className="text-sm text-zinc-400">Loading profile...</p>;
   }
 
-  if (error) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-8">
-        <div className="rounded-xl border border-red-900/50 bg-red-950/20 p-6 text-center">
-          <p className="text-red-400">{error}</p>
-        </div>
-      </div>
-    );
+  if (state.error) {
+    return <p className="text-sm text-rose-400">{state.error}</p>;
+  }
+
+  if (!state.data) {
+    return <p className="text-sm text-zinc-400">No profile data.</p>;
   }
 
   return (
-    <div className="px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-5xl font-bold">My Profile</h1>
-        <p className="mt-2 text-zinc-400">Manage your account information</p>
+    <section className="space-y-8 pb-24">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white">
+            <CircleUserRound className="h-6 w-6" />
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.35em] text-zinc-500">
+              Profile
+            </p>
+            <h1 className="mt-1 text-3xl font-semibold text-white">
+              {state.data.firstName
+                ? `${state.data.firstName} ${state.data.lastName ?? ""}`
+                : "IT Staff"}
+            </h1>
+          </div>
+        </div>
+        <Button
+          className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700"
+          onClick={() => setIsEditing(true)}
+        >
+          <Pencil className="mr-2 h-4 w-4" />
+          Edit profile
+        </Button>
       </div>
 
-      {profile && (
-        <>
-          <Card className="mb-8">
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="border-white/10 bg-white/5 md:col-span-2">
+          <CardHeader>
+            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-zinc-500">
+              <BadgeCheck className="h-3.5 w-3.5" />
+              Profile data
+            </div>
+            <CardTitle>{state.data.firstName || state.data.email}</CardTitle>
+            <CardDescription>
+              Basic account information from the backend.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+
+        <Card className="border-white/10 bg-white/5">
+          <CardHeader>
+            <CardDescription className="flex items-center gap-2 text-zinc-400">
+              <IdCard className="h-4 w-4" />
+              User ID
+            </CardDescription>
+            <CardTitle className="text-lg break-all">{state.data.id}</CardTitle>
+          </CardHeader>
+        </Card>
+
+        <Card className="border-white/10 bg-white/5">
+          <CardHeader>
+            <CardDescription className="flex items-center gap-2 text-zinc-400">
+              <Mail className="h-4 w-4" />
+              Email
+            </CardDescription>
+            <CardTitle className="text-lg break-all">
+              {state.data.email}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+
+        <Card className="border-white/10 bg-white/5">
+          <CardHeader>
+            <CardDescription className="flex items-center gap-2 text-zinc-400">
+              <Shield className="h-4 w-4" />
+              Role
+            </CardDescription>
+            <CardTitle className="text-lg">{state.data.role}</CardTitle>
+          </CardHeader>
+        </Card>
+
+        {state.data.departmentId ? (
+          <Card className="border-white/10 bg-white/5">
             <CardHeader>
-              <div className="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <CardTitle>
-                    {profile.firstName && profile.lastName
-                      ? `${profile.firstName} ${profile.lastName}`
-                      : "IT Staff Member"}
-                  </CardTitle>
-                  <CardDescription className="mt-1">
-                    {profile.email}
-                  </CardDescription>
-                </div>
-                <div className="rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 p-1">
-                  <div className="rounded-full bg-zinc-950 p-4">
-                    <User className="h-8 w-8 text-white" />
-                  </div>
-                </div>
-              </div>
+              <CardDescription className="flex items-center gap-2 text-zinc-400">
+                <Building2 className="h-4 w-4" />
+                Department ID
+              </CardDescription>
+              <CardTitle className="text-lg break-all">
+                {state.data.departmentId}
+              </CardTitle>
             </CardHeader>
           </Card>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Card>
-              <CardContent>
-                <div className="flex items-start gap-4">
-                  <Mail className="h-5 w-5 flex-shrink-0 text-blue-400" />
-                  <div>
-                    <p className="text-sm text-zinc-400">Email</p>
-                    <p className="mt-1 font-medium">{profile.email}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent>
-                <div className="flex items-start gap-4">
-                  <Shield className="h-5 w-5 flex-shrink-0 text-purple-400" />
-                  <div>
-                    <p className="text-sm text-zinc-400">Role</p>
-                    <p className="mt-1 font-medium">{profile.role}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent>
-                <div className="flex items-start gap-4">
-                  <User className="h-5 w-5 flex-shrink-0 text-green-400" />
-                  <div>
-                    <p className="text-sm text-zinc-400">User ID</p>
-                    <p className="mt-1 font-medium font-mono text-xs">
-                      {profile.id}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent>
-                <div className="flex items-start gap-4">
-                  <Calendar className="h-5 w-5 flex-shrink-0 text-amber-400" />
-                  <div>
-                    <p className="text-sm text-zinc-400">Status</p>
-                    <p className="mt-1 font-medium">Active</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="mt-8 flex gap-4">
-            <Button
-              className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700"
-              onClick={() => setIsEditing(true)}
-            >
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit Profile
-            </Button>
-            <Button className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700">
-              Change Password
-            </Button>
-          </div>
-        </>
-      )}
+        ) : null}
+      </div>
 
       <EditProfileModal
         open={isEditing}
-        profile={profile}
+        profile={state.data}
         onClose={() => setIsEditing(false)}
-        onUpdated={(updated) => setProfile(updated)}
+        onUpdated={(updated) =>
+          setState((current) => ({ ...current, data: updated }))
+        }
       />
-    </div>
+    </section>
   );
 }

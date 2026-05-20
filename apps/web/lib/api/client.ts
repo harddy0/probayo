@@ -1,12 +1,12 @@
 /**
  * HTTP Client Module
- * 
+ *
  * Handles all API communication with the backend, including:
  * - Authentication session management (in-memory + sessionStorage)
  * - Automatic Authorization header injection
  * - Error handling and transformation
  * - Base URL resolution
- * 
+ *
  * Session Strategy:
  * - In-memory cache (authSession) for performance
  * - SessionStorage persistence for page reloads
@@ -23,6 +23,22 @@ type RequestOptions = {
   method?: HttpMethod;
   headers?: HeadersInit;
   body?: unknown;
+  signal?: AbortSignal;
+};
+
+/** Configuration for raw HTTP requests (non-JSON bodies) */
+type RawRequestOptions = {
+  method?: HttpMethod;
+  headers?: HeadersInit;
+  body?: BodyInit | null;
+  signal?: AbortSignal;
+};
+
+/** Configuration for form-data requests */
+type FormDataRequestOptions = {
+  method?: HttpMethod;
+  headers?: HeadersInit;
+  body?: FormData;
   signal?: AbortSignal;
 };
 
@@ -52,7 +68,7 @@ const hasWindow = () => typeof window !== "undefined";
 
 /**
  * Load auth session from sessionStorage
- * 
+ *
  * Validates session structure before returning to ensure token and identity exist.
  * Returns null if:
  * - Not in browser environment (SSR)
@@ -82,7 +98,7 @@ const loadAuthSession = (): AuthSession | null => {
 
 /**
  * Persist auth session to sessionStorage
- * 
+ *
  * Syncs the in-memory session state with browser storage.
  * Supports both saving (session exists) and clearing (session is null).
  */
@@ -101,7 +117,7 @@ const persistAuthSession = (session: AuthSession | null) => {
 
 /**
  * Get the current authentication session
- * 
+ *
  * Lazy-loads from sessionStorage on first access.
  * Subsequent calls use the in-memory cache for performance.
  * Returns null if user is not authenticated.
@@ -117,7 +133,7 @@ export const getAuthSession = (): AuthSession | null => {
 
 /**
  * Set and persist the authentication session
- * 
+ *
  * Updates both in-memory cache and sessionStorage.
  * Called after successful login to store token and user identity.
  */
@@ -128,7 +144,7 @@ export const setAuthSession = (session: AuthSession) => {
 
 /**
  * Clear the authentication session
- * 
+ *
  * Removes both in-memory cache and sessionStorage entry.
  * Called on logout to end the user's session.
  */
@@ -139,7 +155,7 @@ export const clearAuthSession = () => {
 
 /**
  * Type guard to check if an error is an ApiError
- * 
+ *
  * Used to safely access status and message properties from caught errors.
  * Distinguishes API errors from other error types (network errors, etc).
  */
@@ -150,15 +166,17 @@ export const isApiError = (error: unknown): error is ApiError => {
 
   return "status" in error && "message" in error;
 };
+
 /**
  * Build complete URL for API request
- * 
+ *
  * Handles:
  * - Absolute URLs (returns as-is)
  * - Relative paths (appends to BASE_URL)
  * - URL normalization (removes trailing/leading slashes)
  * - Validates BASE_URL is configured
- */const buildUrl = (path: string) => {
+ */
+const buildUrl = (path: string) => {
   if (path.startsWith("http://") || path.startsWith("https://")) {
     return path;
   }
@@ -172,7 +190,7 @@ export const isApiError = (error: unknown): error is ApiError => {
 
 /**
  * Transform fetch Response into standardized ApiError
- * 
+ *
  * Attempts to parse response body as JSON (backend error details).
  * Falls back to plain text if JSON parsing fails.
  * Preserves HTTP status and status text for client handling.
@@ -194,18 +212,75 @@ const toApiError = async (response: Response): Promise<ApiError> => {
 };
 
 /**
+ * Make raw HTTP request without JSON serialization
+ *
+ * Uses the same auth and error handling as the JSON request helper.
+ * Returns the raw Response for callers that need streams, blobs, or custom parsing.
+ */
+export const requestRaw = async (
+  path: string,
+  options: RawRequestOptions = {},
+): Promise<Response> => {
+  const headers = new Headers(options.headers);
+
+  const session = getAuthSession();
+  if (session?.token) {
+    headers.set("Authorization", `Bearer ${session.token}`);
+  }
+
+  const response = await fetch(buildUrl(path), {
+    method: options.method ?? "GET",
+    headers,
+    body: options.body ?? undefined,
+    signal: options.signal,
+  });
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+
+  return response;
+};
+
+/**
+ * Make form-data request to backend API
+ *
+ * Avoids JSON serialization and lets the browser set multipart boundaries.
+ */
+export const requestFormData = async <T>(
+  path: string,
+  options: FormDataRequestOptions = {},
+): Promise<T> => {
+  const response = await requestRaw(path, {
+    method: options.method ?? "POST",
+    headers: options.headers,
+    body: options.body ?? undefined,
+    signal: options.signal,
+  });
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return response.json() as Promise<T>;
+};
+
+/**
  * Make HTTP request to backend API
- * 
+ *
  * Automatically:
  * - Sets Content-Type to application/json
  * - Injects Bearer token from auth session (if available)
  * - Converts response status 204 (No Content) to undefined
  * - Transforms errors into standardized ApiError format
- * 
+ *
  * Generic type T specifies expected response shape.
  * Throws ApiError on non-OK responses.
  */
-export const request = async <T>(path: string, options: RequestOptions = {}): Promise<T> => {
+export const request = async <T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> => {
   const headers = new Headers(options.headers);
   if (!headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");

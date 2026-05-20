@@ -4,11 +4,14 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "dev:web-prod-api": "turbo run build --filter=api && concurrently --kill-others-on-fail -n web,api -c cyan,green \"npm run -w web dev\" \"npm run -w api start:prod\"",
+    "dev:api-prod-web": "turbo run build --filter=web && concurrently --kill-others-on-fail -n api,web -c green,cyan \"npm run -w api dev\" \"npm run -w web start\"",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types"
   },
   "devDependencies": {
+    "concurrently": "^9.2.0",
     "prettier": "^3.7.4",
     "turbo": "^2.9.6",
     "typescript": "5.9.2"

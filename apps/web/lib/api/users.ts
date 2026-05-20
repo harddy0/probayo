@@ -1,7 +1,7 @@
 /**
  * Users API Module
  *
- * Minimal helper to fetch users for UI dropdowns.
+ * User management: fetching, updating profiles, and password changes.
  */
 
 import { request } from "./client";
@@ -33,3 +33,5 @@ export const updateUserProfile = async (
     body: payload,
   });
 };
+
+

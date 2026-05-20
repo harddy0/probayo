@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import {
   BadgeCheck,
-  CircleUserRound,
-  Mail,
-  IdCard,
   Building2,
+  CircleUserRound,
+  IdCard,
+  Mail,
   Pencil,
+  Shield,
 } from "lucide-react";
 import { fetchProfile } from "@/lib/api/auth";
 import type { UserProfile } from "@/lib/types/auth";
@@ -72,7 +73,7 @@ export default function AdminProfilePage() {
   }
 
   return (
-    <section className="space-y-8">
+    <section className="space-y-8 pb-24">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white">
@@ -83,7 +84,9 @@ export default function AdminProfilePage() {
               Profile
             </p>
             <h1 className="mt-1 text-3xl font-semibold text-white">
-              Admin account
+              {state.data.firstName
+                ? `${state.data.firstName} ${state.data.lastName ?? ""}`
+                : state.data.role}
             </h1>
           </div>
         </div>
@@ -135,7 +138,7 @@ export default function AdminProfilePage() {
         <Card className="border-white/10 bg-white/5">
           <CardHeader>
             <CardDescription className="flex items-center gap-2 text-zinc-400">
-              <BadgeCheck className="h-4 w-4" />
+              <Shield className="h-4 w-4" />
               Role
             </CardDescription>
             <CardTitle className="text-lg">{state.data.role}</CardTitle>
