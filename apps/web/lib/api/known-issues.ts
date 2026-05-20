@@ -12,6 +12,7 @@ import type {
   CreateKnownIssueRequest,
   KnownIssue,
   UpdateKnownIssueRequest,
+  UpdateKnownIssueStatusRequest,
 } from "../types/known-issues";
 
 /**
@@ -70,11 +71,16 @@ export const deleteKnownIssue = async (id: string): Promise<void> => {
 };
 
 /**
- * Resolve a known issue (Admin only).
+ * Update a known issue's status (Admin only).
+ * Uses PATCH since the API has no dedicated resolve endpoint.
  */
-export const resolveKnownIssue = async (id: string): Promise<KnownIssue> => {
-  return request<KnownIssue>(`/known-issues/${id}/resolve`, {
-    method: "POST",
+export const updateKnownIssueStatus = async (
+  id: string,
+  data: UpdateKnownIssueStatusRequest,
+): Promise<KnownIssue> => {
+  return request<KnownIssue>(`/known-issues/${id}`, {
+    method: "PATCH",
+    body: data,
   });
 };
 

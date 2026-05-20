@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
@@ -154,6 +155,26 @@ export default function AdminLayout({
                 )}
               >
                 Ticket Categories
+              </span>
+            </Link>
+
+            <Link
+              href="/admin/known-issues"
+              className={cn(
+                "group relative flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition",
+                pathname === "/admin/known-issues"
+                  ? "bg-white/10 text-white"
+                  : "text-zinc-400 hover:bg-white/5",
+              )}
+            >
+              <AlertTriangle className="h-5 w-5 shrink-0" />
+              <span
+                className={cn(
+                  "transition-all duration-300",
+                  isCollapsed && "w-0 overflow-hidden",
+                )}
+              >
+                Known Issues
               </span>
             </Link>
 

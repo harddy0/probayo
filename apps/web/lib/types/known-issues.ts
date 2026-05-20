@@ -5,7 +5,7 @@
  * Extracted from the ticket module for admin CRUD operations.
  */
 
-export type KnownIssueStatus = "active" | "resolved";
+export type KnownIssueStatus = "Active" | "Resolved";
 
 export type KnownIssue = {
   id: string;
@@ -28,6 +28,10 @@ export type UpdateKnownIssueRequest = {
   title?: string;
   description?: string;
   status?: KnownIssueStatus;
+};
+
+export type UpdateKnownIssueStatusRequest = {
+  status: KnownIssueStatus;
 };
 
 export type BulkAttachKnownIssueRequest = {

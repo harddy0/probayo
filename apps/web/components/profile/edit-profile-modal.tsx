@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { Loader, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast-provider";
 import { isApiError } from "@/lib/api/client";
 import {
@@ -25,71 +26,57 @@ type FormState = {
   email: string;
 };
 
-const emptyFormState: FormState = {
-  firstName: "",
-  lastName: "",
-  email: "",
-};
-
-export function EditProfileModal({
-  open,
+function EditProfileModalInner({
   profile,
   onClose,
   onUpdated,
-}: EditProfileModalProps) {
-  const [formState, setFormState] = useState<FormState>(emptyFormState);
+}: {
+  profile: UserProfile | null;
+  onClose: () => void;
+  onUpdated: (profile: UserProfile) => void;
+}) {
+  const [form, setForm] = useState<FormState>({
+    firstName: "",
+    lastName: "",
+    email: "",
+  });
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const { push } = useToast();
 
   useEffect(() => {
-    if (!open) return;
     if (!profile) {
-      setFormState(emptyFormState);
+      setForm({ firstName: "", lastName: "", email: "" });
       return;
     }
-
-    setFormState({
+    setForm({
       firstName: profile.firstName ?? "",
       lastName: profile.lastName ?? "",
       email: profile.email ?? "",
     });
     setError(null);
-  }, [open, profile]);
+  }, [profile]);
 
-  const payload = useMemo<UpdateUserProfilePayload>(() => {
+  const profilePayload = useMemo<UpdateUserProfilePayload>(() => {
     if (!profile) return {};
+    const p: UpdateUserProfilePayload = {};
+    const firstName = form.firstName.trim();
+    const lastName = form.lastName.trim();
+    if (firstName && firstName !== (profile.firstName ?? "")) p.firstName = firstName;
+    if (lastName && lastName !== (profile.lastName ?? "")) p.lastName = lastName;
+    return p;
+  }, [form.firstName, form.lastName, profile]);
 
-    const nextPayload: UpdateUserProfilePayload = {};
-    const firstName = formState.firstName.trim();
-    const lastName = formState.lastName.trim();
+  const canSave = Object.keys(profilePayload).length > 0;
 
-    if (firstName && firstName !== (profile.firstName ?? "")) {
-      nextPayload.firstName = firstName;
-    }
-
-    if (lastName && lastName !== (profile.lastName ?? "")) {
-      nextPayload.lastName = lastName;
-    }
-
-    return nextPayload;
-  }, [formState.firstName, formState.lastName, profile]);
-
-  const hasChanges = Object.keys(payload).length > 0;
-
-  const handleConfirm = async () => {
-    if (!profile) return;
-
-    if (!hasChanges) {
-      setError("No changes to save.");
-      return;
-    }
+  const handleSave = async () => {
+    if (!profile || !canSave) return;
 
     setIsSaving(true);
     setError(null);
 
     try {
-      const updated = await updateUserProfile(profile.id, payload);
+      const updated = await updateUserProfile(profile.id, profilePayload);
       onUpdated(updated);
       push({
         title: "Profile updated",
@@ -105,70 +92,129 @@ export function EditProfileModal({
   };
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      onConfirm={handleConfirm}
-      title="Edit profile"
-      description="Keep your name up to date. Email changes are managed by administrators."
-      confirmLabel="Save changes"
-      loading={isSaving}
+    <div
+      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/70 sm:items-center"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div className="space-y-5">
-        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-300">
-          Review your details before saving. Only your name can be edited here.
-        </div>
-        <div>
-          <Label className="text-sm font-medium text-zinc-300">
-            First name
-          </Label>
-          <Input
-            value={formState.firstName}
-            onChange={(event) =>
-              setFormState((current) => ({
-                ...current,
-                firstName: event.target.value,
-              }))
-            }
-            placeholder="Enter your first name"
-          />
-        </div>
+      <div className="mx-3 my-6 w-full max-w-[90vw] sm:mx-4 sm:max-w-[640px]">
+        <div className="flex max-h-[85vh] flex-col rounded-lg border border-white/10 bg-zinc-900 shadow-2xl">
+          {/* ── Header ── */}
+          <div className="flex shrink-0 items-center justify-between border-b border-white/[0.06] px-5 py-3.5">
+            <div>
+              <h2 className="text-base font-medium text-white">Edit profile</h2>
+              <p className="mt-0.5 text-xs text-zinc-500">
+                Update your account information.
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              disabled={isSaving}
+              className="shrink-0 rounded-lg p-1.5 text-zinc-500 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
 
-        <div>
-          <Label className="text-sm font-medium text-zinc-300">Last name</Label>
-          <Input
-            value={formState.lastName}
-            onChange={(event) =>
-              setFormState((current) => ({
-                ...current,
-                lastName: event.target.value,
-              }))
-            }
-            placeholder="Enter your last name"
-          />
-        </div>
+          {/* ── Body ── */}
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            <div className="space-y-5">
+              {error ? (
+                <div className="flex items-center gap-2 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+                  <p className="text-sm text-rose-200">{error}</p>
+                </div>
+              ) : null}
 
-        <div>
-          <Label className="text-sm font-medium text-zinc-300">Email</Label>
-          <Input
-            type="email"
-            value={formState.email}
-            placeholder="Enter your email"
-            disabled
-          />
-          <p className="mt-2 text-xs text-zinc-500">
-            Email updates require administrator approval.
-          </p>
-        </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="ep-first">First name</Label>
+                  <Input
+                    id="ep-first"
+                    value={form.firstName}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, firstName: e.target.value }))
+                    }
+                    placeholder="Enter first name"
+                    disabled={isSaving}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ep-last">Last name</Label>
+                  <Input
+                    id="ep-last"
+                    value={form.lastName}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, lastName: e.target.value }))
+                    }
+                    placeholder="Enter last name"
+                    disabled={isSaving}
+                  />
+                </div>
+              </div>
 
-        {error ? <p className="text-sm text-rose-400">{error}</p> : null}
-        {!hasChanges ? (
-          <p className="text-xs text-zinc-500">
-            Make a change to enable saving.
-          </p>
-        ) : null}
+              <div className="space-y-2">
+                <Label htmlFor="ep-email">Email</Label>
+                <Input
+                  id="ep-email"
+                  type="email"
+                  value={form.email}
+                  placeholder="your@email.com"
+                  disabled
+                />
+                <p className="text-xs text-zinc-500">
+                  Email changes require administrator approval.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Footer ── */}
+          <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-white/[0.06] px-5 py-3.5">
+            <button
+              onClick={onClose}
+              disabled={isSaving}
+              className="h-8 rounded-lg border border-white/10 px-3 text-sm text-zinc-300 transition hover:bg-white/10 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isSaving || !canSave}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3.5 text-sm font-medium text-zinc-950 transition hover:bg-zinc-100 disabled:opacity-50"
+            >
+              {isSaving ? <Loader className="h-3.5 w-3.5 animate-spin" /> : null}
+              Save changes
+            </button>
+          </div>
+        </div>
       </div>
-    </Modal>
+    </div>
+  );
+}
+
+export function EditProfileModal({
+  open,
+  profile,
+  onClose,
+  onUpdated,
+}: EditProfileModalProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!open || !mounted) return null;
+
+  return createPortal(
+    <EditProfileModalInner
+      profile={profile}
+      onClose={onClose}
+      onUpdated={onUpdated}
+    />,
+    document.body,
   );
 }
 

@@ -389,8 +389,6 @@ export default function ClientTicketsPage() {
     void loadReferenceData();
   }, [loadReferenceData]);
 
-
-
   const ticketAttachments = useMemo(() => {
     if (!selectedTicket?.attachments) return [];
     return selectedTicket.attachments.filter(
@@ -575,7 +573,7 @@ export default function ClientTicketsPage() {
 
   const ticketListEmpty = !isLoading && filteredTickets.length === 0;
   const activeKnownIssuesCount = knownIssues.filter(
-    (i) => i.status === "active",
+    (i) => i.status === "Active",
   ).length;
 
   return (
@@ -619,7 +617,9 @@ export default function ClientTicketsPage() {
       {referenceError ? (
         <div className="flex items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
           <AlertCircle className="h-5 w-5 shrink-0 text-amber-300" />
-          <p className="text-sm leading-relaxed text-amber-200">{referenceError}</p>
+          <p className="text-sm leading-relaxed text-amber-200">
+            {referenceError}
+          </p>
         </div>
       ) : null}
 
@@ -631,9 +631,8 @@ export default function ClientTicketsPage() {
             <p className="text-sm leading-relaxed text-amber-200">
               There {activeKnownIssuesCount === 1 ? "is" : "are"}{" "}
               <span className="font-semibold">{activeKnownIssuesCount}</span>{" "}
-              active known{" "}
-              {activeKnownIssuesCount === 1 ? "issue" : "issues"} that may
-              affect your request.
+              active known {activeKnownIssuesCount === 1 ? "issue" : "issues"}{" "}
+              that may affect your request.
             </p>
           </div>
           <button
@@ -693,7 +692,10 @@ export default function ClientTicketsPage() {
           // Skeleton loading state
           <div className="divide-y divide-white/[0.06]">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex animate-pulse items-center gap-4 px-6 py-4">
+              <div
+                key={i}
+                className="flex animate-pulse items-center gap-4 px-6 py-4"
+              >
                 <div className="h-4 w-8 rounded bg-white/10" />
                 <div className="h-4 flex-1 rounded bg-white/10" />
                 <div className="h-4 w-20 rounded bg-white/10" />
@@ -811,466 +813,481 @@ export default function ClientTicketsPage() {
         ? createPortal(
             <div
               className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/80 backdrop-blur-xl"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) handleCloseModal();
-          }}
-        >
-          <div className="mx-4 my-6 w-full max-w-3xl sm:mx-auto">
-            <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-3xl border border-white/10 bg-zinc-900/95 shadow-2xl backdrop-blur-xl">
-              {/* Modal Header */}
-              <div className="flex items-start justify-between border-b border-white/[0.06] px-6 py-5">
-                <div className="min-w-0 flex-1">
-                  {isDetailLoading ? (
-                    <div className="flex items-center gap-3">
-                      <Loader className="h-5 w-5 animate-spin text-zinc-400" />
-                      <p className="text-sm text-zinc-400">Loading ticket details…</p>
+              onClick={(e) => {
+                if (e.target === e.currentTarget) handleCloseModal();
+              }}
+            >
+              <div className="mx-4 my-6 w-full max-w-3xl sm:mx-auto">
+                <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-3xl border border-white/10 bg-zinc-900/95 shadow-2xl backdrop-blur-xl">
+                  {/* Modal Header */}
+                  <div className="flex items-start justify-between border-b border-white/[0.06] px-6 py-5">
+                    <div className="min-w-0 flex-1">
+                      {isDetailLoading ? (
+                        <div className="flex items-center gap-3">
+                          <Loader className="h-5 w-5 animate-spin text-zinc-400" />
+                          <p className="text-sm text-zinc-400">
+                            Loading ticket details…
+                          </p>
+                        </div>
+                      ) : detailError ? (
+                        <div className="flex items-center gap-3">
+                          <AlertCircle className="h-5 w-5 shrink-0 text-rose-400" />
+                          <p className="text-sm text-rose-200">{detailError}</p>
+                        </div>
+                      ) : selectedTicket ? (
+                        <>
+                          <div className="flex items-center gap-3">
+                            <h2 className="text-xl font-semibold tracking-tight text-white">
+                              {selectedTicket.title}
+                            </h2>
+                            <span
+                              className={cn(
+                                "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
+                                statusStyles[selectedTicket.status],
+                              )}
+                            >
+                              {statusLabels[selectedTicket.status]}
+                            </span>
+                            <span
+                              className={cn(
+                                "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
+                                priorityStyles[selectedTicket.priority],
+                              )}
+                            >
+                              {priorityLabels[selectedTicket.priority]}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-zinc-500">
+                            ID: {selectedTicket.id}
+                          </p>
+                        </>
+                      ) : null}
                     </div>
-                  ) : detailError ? (
-                    <div className="flex items-center gap-3">
-                      <AlertCircle className="h-5 w-5 shrink-0 text-rose-400" />
-                      <p className="text-sm text-rose-200">{detailError}</p>
-                    </div>
-                  ) : selectedTicket ? (
-                    <>
-                      <div className="flex items-center gap-3">
-                        <h2 className="text-xl font-semibold tracking-tight text-white">
-                          {selectedTicket.title}
-                        </h2>
-                        <span
-                          className={cn(
-                            "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
-                            statusStyles[selectedTicket.status],
-                          )}
-                        >
-                          {statusLabels[selectedTicket.status]}
-                        </span>
-                        <span
-                          className={cn(
-                            "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
-                            priorityStyles[selectedTicket.priority],
-                          )}
-                        >
-                          {priorityLabels[selectedTicket.priority]}
-                        </span>
+                    <button
+                      type="button"
+                      onClick={handleCloseModal}
+                      className="ml-4 shrink-0 rounded-full p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  {/* Tab Bar */}
+                  <div className="flex gap-0 border-b border-white/[0.06] px-6">
+                    {[
+                      { id: "details" as const, label: "Details" },
+                      { id: "attachments" as const, label: "Attachments" },
+                      { id: "comments" as const, label: "Comments" },
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setActiveTab(tab.id)}
+                        className={cn(
+                          "relative px-4 py-3 text-sm font-medium transition-colors",
+                          activeTab === tab.id
+                            ? "text-white"
+                            : "text-zinc-400 hover:text-zinc-200",
+                        )}
+                      >
+                        {tab.label}
+                        {activeTab === tab.id ? (
+                          <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-white" />
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Modal Body */}
+                  <div className="flex-1 overflow-y-auto p-6">
+                    {isDetailLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader className="h-6 w-6 animate-spin text-zinc-400" />
                       </div>
-                      <p className="mt-1 text-xs text-zinc-500">
-                        ID: {selectedTicket.id}
-                      </p>
-                    </>
-                  ) : null}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="ml-4 shrink-0 rounded-full p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
+                    ) : detailError ? (
+                      <div className="flex items-center gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4">
+                        <AlertCircle className="h-5 w-5 shrink-0 text-rose-400" />
+                        <p className="text-sm text-rose-200">{detailError}</p>
+                      </div>
+                    ) : !selectedTicket ? (
+                      <div className="py-12 text-center text-sm text-zinc-500">
+                        No ticket selected.
+                      </div>
+                    ) : (
+                      <>
+                        {/* ── Details Tab ── */}
+                        {activeTab === "details" ? (
+                          <div className="space-y-6">
+                            {/* Description */}
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                              <p className="mb-2 text-[10px] uppercase tracking-widest text-zinc-500">
+                                Description
+                              </p>
+                              <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-200">
+                                {selectedTicket.description}
+                              </p>
+                            </div>
 
-              {/* Tab Bar */}
-              <div className="flex gap-0 border-b border-white/[0.06] px-6">
-                {([
-                  { id: "details" as const, label: "Details" },
-                  { id: "attachments" as const, label: "Attachments" },
-                  { id: "comments" as const, label: "Comments" },
-                ]).map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={cn(
-                      "relative px-4 py-3 text-sm font-medium transition-colors",
-                      activeTab === tab.id
-                        ? "text-white"
-                        : "text-zinc-400 hover:text-zinc-200",
-                    )}
-                  >
-                    {tab.label}
-                    {activeTab === tab.id ? (
-                      <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-white" />
-                    ) : null}
-                  </button>
-                ))}
-              </div>
+                            {/* Metadata Grid */}
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <MetadataItem
+                                label="Category"
+                                value={selectedTicket.category?.name || "—"}
+                              />
+                              <MetadataItem
+                                label="Asset"
+                                value={selectedTicket.asset?.deviceType || "—"}
+                              />
+                              <MetadataItem
+                                label="Assigned to"
+                                value={formatUserName(
+                                  selectedTicket.assignedToUser,
+                                )}
+                              />
+                              <MetadataItem
+                                label="Created"
+                                value={formatDateTime(selectedTicket.createdAt)}
+                              />
+                              <MetadataItem
+                                label="Updated"
+                                value={formatDateTime(selectedTicket.updatedAt)}
+                              />
+                              <MetadataItem
+                                label="Acknowledged"
+                                value={formatDateTime(
+                                  selectedTicket.acknowledgedAt,
+                                )}
+                              />
+                            </div>
 
-              {/* Modal Body */}
-              <div className="flex-1 overflow-y-auto p-6">
-                {isDetailLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader className="h-6 w-6 animate-spin text-zinc-400" />
-                  </div>
-                ) : detailError ? (
-                  <div className="flex items-center gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4">
-                    <AlertCircle className="h-5 w-5 shrink-0 text-rose-400" />
-                    <p className="text-sm text-rose-200">{detailError}</p>
-                  </div>
-                ) : !selectedTicket ? (
-                  <div className="py-12 text-center text-sm text-zinc-500">
-                    No ticket selected.
-                  </div>
-                ) : (
-                  <>
-                    {/* ── Details Tab ── */}
-                    {activeTab === "details" ? (
-                      <div className="space-y-6">
-                        {/* Description */}
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                          <p className="mb-2 text-[10px] uppercase tracking-widest text-zinc-500">
-                            Description
-                          </p>
-                          <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-200">
-                            {selectedTicket.description}
-                          </p>
-                        </div>
-
-                        {/* Metadata Grid */}
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <MetadataItem
-                            label="Category"
-                            value={selectedTicket.category?.name || "—"}
-                          />
-                          <MetadataItem
-                            label="Asset"
-                            value={selectedTicket.asset?.deviceType || "—"}
-                          />
-                          <MetadataItem
-                            label="Assigned to"
-                            value={formatUserName(selectedTicket.assignedToUser)}
-                          />
-                          <MetadataItem
-                            label="Created"
-                            value={formatDateTime(selectedTicket.createdAt)}
-                          />
-                          <MetadataItem
-                            label="Updated"
-                            value={formatDateTime(selectedTicket.updatedAt)}
-                          />
-                          <MetadataItem
-                            label="Acknowledged"
-                            value={formatDateTime(selectedTicket.acknowledgedAt)}
-                          />
-                        </div>
-
-                        {/* Status History */}
-                        {selectedTicket.statusHistory &&
-                        selectedTicket.statusHistory.length > 0 ? (
-                          <div className="space-y-3">
-                            <p className="text-[10px] uppercase tracking-widest text-zinc-500">
-                              Status History
-                            </p>
-                            <div className="space-y-1.5">
-                              {selectedTicket.statusHistory.map((entry) => (
-                                <div
-                                  key={entry.id}
-                                  className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-zinc-500">
-                                      {entry.fromStatus
-                                        ? statusLabels[entry.fromStatus]
-                                        : "New"}
-                                    </span>
-                                    <span className="text-zinc-600">→</span>
-                                    <span className="font-medium text-zinc-200">
-                                      {statusLabels[entry.toStatus]}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-3 text-xs text-zinc-500">
-                                    <span>
-                                      {formatUserName(entry.changedByUser)}
-                                    </span>
-                                    <span>
-                                      {formatDateTime(entry.changedAt)}
-                                    </span>
-                                  </div>
+                            {/* Status History */}
+                            {selectedTicket.statusHistory &&
+                            selectedTicket.statusHistory.length > 0 ? (
+                              <div className="space-y-3">
+                                <p className="text-[10px] uppercase tracking-widest text-zinc-500">
+                                  Status History
+                                </p>
+                                <div className="space-y-1.5">
+                                  {selectedTicket.statusHistory.map((entry) => (
+                                    <div
+                                      key={entry.id}
+                                      className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-zinc-500">
+                                          {entry.fromStatus
+                                            ? statusLabels[entry.fromStatus]
+                                            : "New"}
+                                        </span>
+                                        <span className="text-zinc-600">→</span>
+                                        <span className="font-medium text-zinc-200">
+                                          {statusLabels[entry.toStatus]}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-3 text-xs text-zinc-500">
+                                        <span>
+                                          {formatUserName(entry.changedByUser)}
+                                        </span>
+                                        <span>
+                                          {formatDateTime(entry.changedAt)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+
+                        {/* ── Attachments Tab ── */}
+                        {activeTab === "attachments" ? (
+                          <div className="space-y-5">
+                            {/* Upload Input */}
+                            <div className="space-y-2">
+                              <Label htmlFor="ticket-attachments">
+                                Upload files
+                              </Label>
+                              <input
+                                id="ticket-attachments"
+                                ref={ticketFileInputRef}
+                                type="file"
+                                multiple
+                                accept={ACCEPTED_FILE_TYPES}
+                                onChange={(event) =>
+                                  void handleTicketFilesChange(
+                                    event.target.files,
+                                  )
+                                }
+                                className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-xl file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
+                              />
+                              <p className="text-xs text-zinc-500">
+                                Max 10MB per file. Images, PDF, docs,
+                                spreadsheets, text, and archives supported.
+                              </p>
+                            </div>
+
+                            {/* Upload Queue */}
+                            {uploadQueue.length > 0 ? (
+                              <div className="space-y-2">
+                                <p className="text-[10px] uppercase tracking-widest text-zinc-500">
+                                  Uploads
+                                </p>
+                                {uploadQueue.map((item) => (
+                                  <div
+                                    key={item.id}
+                                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300"
+                                  >
+                                    <span className="truncate">
+                                      {item.fileName}
+                                    </span>
+                                    <span
+                                      className={cn(
+                                        "rounded-full px-2 py-0.5 text-[10px] uppercase",
+                                        item.status === "completed"
+                                          ? "bg-emerald-500/10 text-emerald-200"
+                                          : item.status === "failed"
+                                            ? "bg-rose-500/10 text-rose-200"
+                                            : "bg-white/10 text-zinc-200",
+                                      )}
+                                    >
+                                      {item.status}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+
+                            {/* Attachment List */}
+                            {ticketAttachments.length === 0 ? (
+                              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-zinc-500">
+                                No attachments yet.
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                <p className="text-[10px] uppercase tracking-widest text-zinc-500">
+                                  {ticketAttachments.length} attachment
+                                  {ticketAttachments.length !== 1 ? "s" : ""}
+                                </p>
+                                {ticketAttachments.map((attachment) => (
+                                  <div
+                                    key={attachment.id}
+                                    className="overflow-hidden rounded-2xl border border-white/10 bg-white/5"
+                                  >
+                                    {/* Image preview */}
+                                    {attachment.fileType?.startsWith(
+                                      "image/",
+                                    ) ? (
+                                      <div className="border-b border-white/10 bg-white/[0.02] p-3">
+                                        <AttachmentImage
+                                          attachment={attachment}
+                                        />
+                                      </div>
+                                    ) : null}
+
+                                    {/* File info row */}
+                                    <div className="flex items-center justify-between px-4 py-3">
+                                      <div className="min-w-0">
+                                        <p className="truncate text-sm text-zinc-100">
+                                          {attachment.fileName}
+                                        </p>
+                                        <p className="text-xs text-zinc-500">
+                                          {formatFileSize(
+                                            attachment.fileSizeBytes,
+                                          )}{" "}
+                                          ·{" "}
+                                          {formatDateTime(attachment.createdAt)}
+                                        </p>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleDownloadAttachment(attachment)
+                                          }
+                                          className="rounded-full border border-white/10 p-2 text-zinc-300 transition hover:border-white/30 hover:text-white"
+                                        >
+                                          <Download className="h-4 w-4" />
+                                        </button>
+                                        {attachment.uploadedByUserId ===
+                                        currentUserId ? (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleDeleteAttachment(attachment)
+                                            }
+                                            className="rounded-full border border-rose-500/30 p-2 text-rose-300 transition hover:border-rose-400/60 hover:text-rose-100"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </button>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+
+                        {/* ── Comments Tab ── */}
+                        {activeTab === "comments" ? (
+                          <div className="space-y-5">
+                            {/* Comment List */}
+                            {selectedTicket.comments &&
+                            selectedTicket.comments.length > 0 ? (
+                              <div className="space-y-3">
+                                <p className="text-[10px] uppercase tracking-widest text-zinc-500">
+                                  {selectedTicket.comments.length} comment
+                                  {selectedTicket.comments.length !== 1
+                                    ? "s"
+                                    : ""}
+                                </p>
+                                {selectedTicket.comments.map((comment) => (
+                                  <div
+                                    key={comment.id}
+                                    className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                                  >
+                                    <div className="flex items-center justify-between text-xs text-zinc-500">
+                                      <span className="font-medium text-zinc-300">
+                                        {formatUserName(comment.authorUser)}
+                                      </span>
+                                      <span>
+                                        {formatDateTime(comment.createdAt)}
+                                      </span>
+                                    </div>
+                                    <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-zinc-200">
+                                      {comment.body}
+                                    </p>
+
+                                    {/* Comment Attachments */}
+                                    {comment.attachments &&
+                                    comment.attachments.length > 0 ? (
+                                      <div className="mt-3 space-y-2">
+                                        {comment.attachments.map(
+                                          (attachment) => (
+                                            <div
+                                              key={attachment.id}
+                                              className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]"
+                                            >
+                                              {attachment.fileType?.startsWith(
+                                                "image/",
+                                              ) ? (
+                                                <div className="border-b border-white/10 bg-white/[0.02] p-2">
+                                                  <AttachmentImage
+                                                    attachment={attachment}
+                                                  />
+                                                </div>
+                                              ) : null}
+                                              <div className="flex items-center justify-between px-3 py-2">
+                                                <div className="min-w-0">
+                                                  <p className="truncate text-xs text-zinc-100">
+                                                    {attachment.fileName}
+                                                  </p>
+                                                  <p className="text-[10px] text-zinc-500">
+                                                    {formatFileSize(
+                                                      attachment.fileSizeBytes,
+                                                    )}{" "}
+                                                    ·{" "}
+                                                    {formatDateTime(
+                                                      attachment.createdAt,
+                                                    )}
+                                                  </p>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                      handleDownloadAttachment(
+                                                        attachment,
+                                                      )
+                                                    }
+                                                    className="rounded-full border border-white/10 p-1.5 text-zinc-300 transition hover:border-white/30 hover:text-white"
+                                                  >
+                                                    <Download className="h-3.5 w-3.5" />
+                                                  </button>
+                                                  {attachment.uploadedByUserId ===
+                                                  currentUserId ? (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() =>
+                                                        handleDeleteAttachment(
+                                                          attachment,
+                                                        )
+                                                      }
+                                                      className="rounded-full border border-rose-500/30 p-1.5 text-rose-300 transition hover:border-rose-400/60 hover:text-rose-100"
+                                                    >
+                                                      <Trash2 className="h-3.5 w-3.5" />
+                                                    </button>
+                                                  ) : null}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ),
+                                        )}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-zinc-500">
+                                No comments yet.
+                              </div>
+                            )}
+
+                            {/* Add Comment Form */}
+                            <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+                              <Label>Add a comment</Label>
+                              <Textarea
+                                value={commentBody}
+                                onChange={(event) =>
+                                  setCommentBody(event.target.value)
+                                }
+                                placeholder="Share an update, question, or clarification"
+                                rows={3}
+                              />
+                              <input
+                                ref={commentFileInputRef}
+                                type="file"
+                                multiple
+                                accept={ACCEPTED_FILE_TYPES}
+                                onChange={(event) =>
+                                  setCommentFiles(event.target.files)
+                                }
+                                className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-xl file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
+                              />
+                              {commentError ? (
+                                <p className="text-sm text-rose-400">
+                                  {commentError}
+                                </p>
+                              ) : null}
+                              <div className="flex justify-end">
+                                <Button
+                                  className="h-10"
+                                  onClick={() => void handleCommentSubmit()}
+                                  disabled={isCommentSubmitting}
+                                >
+                                  {isCommentSubmitting ? (
+                                    <Loader className="mr-2 h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <FileUp className="mr-2 h-4 w-4" />
+                                  )}
+                                  Add comment
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         ) : null}
-                      </div>
-                    ) : null}
-
-                    {/* ── Attachments Tab ── */}
-                    {activeTab === "attachments" ? (
-                      <div className="space-y-5">
-                        {/* Upload Input */}
-                        <div className="space-y-2">
-                          <Label htmlFor="ticket-attachments">
-                            Upload files
-                          </Label>
-                          <input
-                            id="ticket-attachments"
-                            ref={ticketFileInputRef}
-                            type="file"
-                            multiple
-                            accept={ACCEPTED_FILE_TYPES}
-                            onChange={(event) =>
-                              void handleTicketFilesChange(event.target.files)
-                            }
-                            className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-xl file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
-                          />
-                          <p className="text-xs text-zinc-500">
-                            Max 10MB per file. Images, PDF, docs, spreadsheets,
-                            text, and archives supported.
-                          </p>
-                        </div>
-
-                        {/* Upload Queue */}
-                        {uploadQueue.length > 0 ? (
-                          <div className="space-y-2">
-                            <p className="text-[10px] uppercase tracking-widest text-zinc-500">
-                              Uploads
-                            </p>
-                            {uploadQueue.map((item) => (
-                              <div
-                                key={item.id}
-                                className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300"
-                              >
-                                <span className="truncate">
-                                  {item.fileName}
-                                </span>
-                                <span
-                                  className={cn(
-                                    "rounded-full px-2 py-0.5 text-[10px] uppercase",
-                                    item.status === "completed"
-                                      ? "bg-emerald-500/10 text-emerald-200"
-                                      : item.status === "failed"
-                                        ? "bg-rose-500/10 text-rose-200"
-                                        : "bg-white/10 text-zinc-200",
-                                  )}
-                                >
-                                  {item.status}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-
-                        {/* Attachment List */}
-                        {ticketAttachments.length === 0 ? (
-                          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-zinc-500">
-                            No attachments yet.
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            <p className="text-[10px] uppercase tracking-widest text-zinc-500">
-                              {ticketAttachments.length} attachment
-                              {ticketAttachments.length !== 1 ? "s" : ""}
-                            </p>
-                            {ticketAttachments.map((attachment) => (
-                              <div
-                                key={attachment.id}
-                                className="overflow-hidden rounded-2xl border border-white/10 bg-white/5"
-                              >
-                                {/* Image preview */}
-                                {attachment.fileType?.startsWith("image/") ? (
-                                  <div className="border-b border-white/10 bg-white/[0.02] p-3">
-                                    <AttachmentImage attachment={attachment} />
-                                  </div>
-                                ) : null}
-
-                                {/* File info row */}
-                                <div className="flex items-center justify-between px-4 py-3">
-                                  <div className="min-w-0">
-                                    <p className="truncate text-sm text-zinc-100">
-                                      {attachment.fileName}
-                                    </p>
-                                    <p className="text-xs text-zinc-500">
-                                      {formatFileSize(
-                                        attachment.fileSizeBytes,
-                                      )}{" "}
-                                      · {formatDateTime(attachment.createdAt)}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        handleDownloadAttachment(attachment)
-                                      }
-                                      className="rounded-full border border-white/10 p-2 text-zinc-300 transition hover:border-white/30 hover:text-white"
-                                    >
-                                      <Download className="h-4 w-4" />
-                                    </button>
-                                    {attachment.uploadedByUserId ===
-                                    currentUserId ? (
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleDeleteAttachment(attachment)
-                                        }
-                                        className="rounded-full border border-rose-500/30 p-2 text-rose-300 transition hover:border-rose-400/60 hover:text-rose-100"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </button>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ) : null}
-
-                    {/* ── Comments Tab ── */}
-                    {activeTab === "comments" ? (
-                      <div className="space-y-5">
-                        {/* Comment List */}
-                        {selectedTicket.comments &&
-                        selectedTicket.comments.length > 0 ? (
-                          <div className="space-y-3">
-                            <p className="text-[10px] uppercase tracking-widest text-zinc-500">
-                              {selectedTicket.comments.length} comment
-                              {selectedTicket.comments.length !== 1
-                                ? "s"
-                                : ""}
-                            </p>
-                            {selectedTicket.comments.map((comment) => (
-                              <div
-                                key={comment.id}
-                                className="rounded-2xl border border-white/10 bg-white/5 p-4"
-                              >
-                                <div className="flex items-center justify-between text-xs text-zinc-500">
-                                  <span className="font-medium text-zinc-300">
-                                    {formatUserName(comment.authorUser)}
-                                  </span>
-                                  <span>
-                                    {formatDateTime(comment.createdAt)}
-                                  </span>
-                                </div>
-                                <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-zinc-200">
-                                  {comment.body}
-                                </p>
-
-                                {/* Comment Attachments */}
-                                {comment.attachments &&
-                                comment.attachments.length > 0 ? (
-                                  <div className="mt-3 space-y-2">
-                                    {comment.attachments.map((attachment) => (
-                                      <div
-                                        key={attachment.id}
-                                        className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]"
-                                      >
-                                        {attachment.fileType?.startsWith(
-                                          "image/",
-                                        ) ? (
-                                          <div className="border-b border-white/10 bg-white/[0.02] p-2">
-                                            <AttachmentImage
-                                              attachment={attachment}
-                                            />
-                                          </div>
-                                        ) : null}
-                                        <div className="flex items-center justify-between px-3 py-2">
-                                          <div className="min-w-0">
-                                            <p className="truncate text-xs text-zinc-100">
-                                              {attachment.fileName}
-                                            </p>
-                                            <p className="text-[10px] text-zinc-500">
-                                              {formatFileSize(
-                                                attachment.fileSizeBytes,
-                                              )}{" "}
-                                              ·{" "}
-                                              {formatDateTime(
-                                                attachment.createdAt,
-                                              )}
-                                            </p>
-                                          </div>
-                                          <div className="flex items-center gap-1">
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                handleDownloadAttachment(
-                                                  attachment,
-                                                )
-                                              }
-                                              className="rounded-full border border-white/10 p-1.5 text-zinc-300 transition hover:border-white/30 hover:text-white"
-                                            >
-                                              <Download className="h-3.5 w-3.5" />
-                                            </button>
-                                            {attachment.uploadedByUserId ===
-                                            currentUserId ? (
-                                              <button
-                                                type="button"
-                                                onClick={() =>
-                                                  handleDeleteAttachment(
-                                                    attachment,
-                                                  )
-                                                }
-                                                className="rounded-full border border-rose-500/30 p-1.5 text-rose-300 transition hover:border-rose-400/60 hover:text-rose-100"
-                                              >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                              </button>
-                                            ) : null}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : null}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-zinc-500">
-                            No comments yet.
-                          </div>
-                        )}
-
-                        {/* Add Comment Form */}
-                        <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-                          <Label>Add a comment</Label>
-                          <Textarea
-                            value={commentBody}
-                            onChange={(event) =>
-                              setCommentBody(event.target.value)
-                            }
-                            placeholder="Share an update, question, or clarification"
-                            rows={3}
-                          />
-                          <input
-                            ref={commentFileInputRef}
-                            type="file"
-                            multiple
-                            accept={ACCEPTED_FILE_TYPES}
-                            onChange={(event) =>
-                              setCommentFiles(event.target.files)
-                            }
-                            className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-xl file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
-                          />
-                          {commentError ? (
-                            <p className="text-sm text-rose-400">
-                              {commentError}
-                            </p>
-                          ) : null}
-                          <div className="flex justify-end">
-                            <Button
-                              className="h-10"
-                              onClick={() => void handleCommentSubmit()}
-                              disabled={isCommentSubmitting}
-                            >
-                              {isCommentSubmitting ? (
-                                <Loader className="mr-2 h-4 w-4 animate-spin" />
-                              ) : (
-                                <FileUp className="mr-2 h-4 w-4" />
-                              )}
-                              Add comment
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
-                  </>
-                )}
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-            </div>
-          </div>,
-          document.body,
-        )
-      : null}
+            </div>,
+            document.body,
+          )
+        : null}
 
       {/* ── Create Ticket Modal ── */}
       <TicketCreateModal
