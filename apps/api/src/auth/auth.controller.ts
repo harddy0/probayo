@@ -18,6 +18,8 @@ import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ActiveUserGuard } from './guards/active-user.guard';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -69,5 +71,22 @@ export class AuthController {
   getProfile(@Request() req): any {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     return req.user;
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard, ActiveUserGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change current user password' })
+  @ApiBody({ type: ChangePasswordDto })
+  @ApiResponse({ status: 200, description: 'Password updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'User account is inactive' })
+  changePassword(@Request() req, @Body() body: ChangePasswordDto) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    return this.authService.changePassword(
+      req.user.id,
+      body.currentPassword,
+      body.newPassword,
+    );
   }
 }

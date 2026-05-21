@@ -18,10 +18,15 @@ import {
   ApiTags,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { UserRole } from '@prisma/client';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ActiveUserGuard } from '../auth/guards/active-user.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 
 @ApiTags('users')
 @Controller('users')
@@ -29,6 +34,9 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard, ActiveUserGuard, RolesGuard)
+  @Roles(UserRole.Admin)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new user' })
   @ApiBody({ type: CreateUserDto })
   @ApiResponse({ status: 201, description: 'User successfully created.' })
@@ -37,6 +45,9 @@ export class UsersController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard, ActiveUserGuard, RolesGuard)
+  @Roles(UserRole.Admin)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'List all users' })
   @ApiResponse({ status: 200, description: 'Returns all users.' })
   findAll() {
@@ -44,6 +55,9 @@ export class UsersController {
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard, ActiveUserGuard, RolesGuard)
+  @Roles(UserRole.Admin)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get a single user by ID' })
   @ApiParam({
     name: 'id',
@@ -55,7 +69,7 @@ export class UsersController {
     return this.usersService.findOne(id);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ActiveUserGuard)
   @Patch(':id')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update an existing user' })
@@ -79,7 +93,8 @@ export class UsersController {
     return this.usersService.update(id, updateUserDto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ActiveUserGuard, RolesGuard)
+  @Roles(UserRole.Admin)
   @Delete(':id')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Remove a user by ID' })
@@ -91,5 +106,46 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'User successfully deleted.' })
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
+  }
+
+  @UseGuards(JwtAuthGuard, ActiveUserGuard, RolesGuard)
+  @Roles(UserRole.Admin)
+  @Post(':id/reset-password')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Reset user password to default value',
+    description: 'Sets password to 12345678password',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the user to reset password for',
+    type: 'string',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Password reset to default value',
+  })
+  async resetPassword(@Param('id') id: string) {
+    await this.usersService.resetPasswordToDefault(id);
+    return { message: 'Password reset to default value' };
+  }
+
+  @UseGuards(JwtAuthGuard, ActiveUserGuard, RolesGuard)
+  @Roles(UserRole.Admin)
+  @Patch(':id/status')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update user active status' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the user to update status',
+    type: 'string',
+  })
+  @ApiBody({ type: UpdateUserStatusDto })
+  @ApiResponse({ status: 200, description: 'User status updated.' })
+  updateStatus(
+    @Param('id') id: string,
+    @Body() updateUserStatusDto: UpdateUserStatusDto,
+  ) {
+    return this.usersService.updateStatus(id, updateUserStatusDto.isActive);
   }
 }

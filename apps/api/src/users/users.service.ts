@@ -50,17 +50,44 @@ export class UsersService {
   }
 
   async update(id: string, updateUserDto: UpdateUserDto) {
-    const { departmentId, ...userData } = updateUserDto;
-    const data: any = { ...userData };
-    if (departmentId !== null && departmentId !== undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      data.departmentId = departmentId;
+    const data: { firstName?: string; lastName?: string } = {};
+
+    if (updateUserDto.firstName !== undefined) {
+      data.firstName = updateUserDto.firstName;
+    }
+
+    if (updateUserDto.lastName !== undefined) {
+      data.lastName = updateUserDto.lastName;
     }
 
     return await this.prisma.user.update({
       where: { id },
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       data,
+    });
+  }
+
+  async updatePasswordHash(id: string, passwordHash: string) {
+    return await this.prisma.user.update({
+      where: { id },
+      data: { passwordHash },
+    });
+  }
+
+  async resetPasswordToDefault(id: string) {
+    const defaultPassword = '12345678password';
+    const saltRounds = 10;
+    const hashedValue = await bcrypt.hash(defaultPassword, saltRounds);
+
+    return await this.prisma.user.update({
+      where: { id },
+      data: { passwordHash: hashedValue },
+    });
+  }
+
+  async updateStatus(id: string, isActive: boolean) {
+    return await this.prisma.user.update({
+      where: { id },
+      data: { isActive },
     });
   }
 

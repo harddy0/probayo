@@ -1,4 +1,9 @@
-import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  forwardRef,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -19,6 +24,10 @@ export class AuthService {
 
     if (!user) {
       return null;
+    }
+
+    if (user.isActive !== true) {
+      throw new UnauthorizedException('User account is inactive');
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
@@ -70,5 +79,32 @@ export class AuthService {
     // Token invalidation is typically handled client-side
     // In production, you might maintain a token blacklist in Redis
     return { message: 'Logged out successfully' };
+  }
+
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    const user = await this.usersService.findOne(userId);
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      currentPassword,
+      user.passwordHash,
+    );
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const saltRounds = 10;
+    const hashedValue = await bcrypt.hash(newPassword, saltRounds);
+    await this.usersService.updatePasswordHash(userId, hashedValue);
+
+    return { message: 'Password updated successfully' };
   }
 }
