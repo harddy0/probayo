@@ -16,7 +16,6 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { getAuthSession, isApiError } from "@/lib/api/client";
 import { fetchItStaffDashboardStats } from "@/lib/api/it-staff";
 import type { ItStaffDashboardStats } from "@/lib/types/it-staff";
@@ -30,8 +29,6 @@ const formatUserName = (user?: { firstName?: string; lastName?: string; email?: 
   const name = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
   return name || user.email || "—";
 };
-
-// ── Constants ──
 
 const priorityLabels: Record<TicketPriority, string> = {
   Low: "Low",
@@ -98,21 +95,21 @@ function StatCard({
 
   return (
     <div className={cn(
-      "rounded-2xl border bg-white/[0.03] p-5 transition hover:bg-white/[0.06]",
+      "rounded-xl border bg-white/[0.03] p-4 transition hover:bg-white/[0.06]",
       accentBorders[accent],
     )}>
       <div className="flex items-start justify-between">
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <p className="text-[10px] uppercase tracking-widest text-zinc-500">{label}</p>
-          <p className={cn("text-3xl font-semibold tracking-tight", accentValues[accent])}>
+          <p className={cn("text-2xl font-semibold tracking-tight", accentValues[accent])}>
             {value}
           </p>
           {subtext ? (
-            <p className="text-xs text-zinc-500">{subtext}</p>
+            <p className="text-[10px] text-zinc-500 leading-tight">{subtext}</p>
           ) : null}
         </div>
         <div className={cn(
-          "flex h-10 w-10 items-center justify-center rounded-xl border bg-white/5",
+          "flex h-8 w-8 items-center justify-center rounded-lg border bg-white/5",
           accentIcons[accent],
           accentBorders[accent],
         )}>
@@ -186,22 +183,15 @@ export default function ItStaffDashboard() {
     return () => { mountedRef.current = false; };
   }, [loadStats]);
 
-  // If there's no session, show a prompt to log in instead of hanging
   if (!currentUserId) {
     return (
-      <section className="space-y-8 pb-24">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-[10px] uppercase tracking-widest text-zinc-500">Dashboard</p>
-            <h1 className="mt-1.5 text-3xl font-semibold tracking-tight text-white">IT Staff Dashboard</h1>
-          </div>
+      <section className="flex h-full flex-col items-center justify-center gap-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5">
+          <LogIn className="h-5 w-5 text-zinc-400" />
         </div>
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-            <LogIn className="h-6 w-6 text-zinc-400" />
-          </div>
-          <h2 className="text-lg font-medium text-zinc-200">Session required</h2>
-          <p className="max-w-sm text-sm text-zinc-400">Please log in to view the dashboard.</p>
+        <div className="text-center">
+          <h2 className="text-sm font-semibold text-zinc-200">Session required</h2>
+          <p className="mt-0.5 text-xs text-zinc-500">Please log in to view the dashboard.</p>
         </div>
       </section>
     );
@@ -212,20 +202,19 @@ export default function ItStaffDashboard() {
     await loadStats(true);
   };
 
-  // Build color-coded breakdowns
   const statusBreakdown = stats
     ? Object.entries(stats.byStatus).map(([key, count]) => ({
         key,
         label: statusLabels[key as TicketStatus] || key,
         count,
-        color: {
+        color: ({
           Open: "emerald",
           Acknowledged: "sky",
           PendingUser: "amber",
           InProgress: "indigo",
           Resolved: "emerald",
           Closed: "zinc",
-        }[key] || "zinc",
+        } as Record<string, string>)[key] || "zinc",
       }))
     : [];
 
@@ -234,12 +223,12 @@ export default function ItStaffDashboard() {
         key,
         label: priorityLabels[key as TicketPriority] || key,
         count,
-        color: {
+        color: ({
           Critical: "rose",
           High: "amber",
           Medium: "amber",
           Low: "emerald",
-        }[key] || "zinc",
+        } as Record<string, string>)[key] || "zinc",
       }))
     : [];
 
@@ -248,50 +237,48 @@ export default function ItStaffDashboard() {
     : 0;
 
   return (
-    <section className="space-y-8 pb-24">
-      {/* ── Header ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-[10px] uppercase tracking-widest text-zinc-500">
-            Dashboard
-          </p>
-          <h1 className="mt-1.5 text-3xl font-semibold tracking-tight text-white">
-            IT Staff Dashboard
-          </h1>
-          <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">
-            Monitor and manage support operations
-          </p>
-        </div>
+    <section className="flex h-full flex-col gap-3">
+      {/* ── Compact header ── */}
+      <div className="flex shrink-0 items-center justify-between gap-4">
         <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/10">
+            <Activity className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold text-white">Dashboard</h1>
+            <p className="text-xs text-zinc-500">Monitor and manage support operations</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
           {currentUserEmail ? (
-            <p className="hidden text-xs text-zinc-500 sm:block">
-              Signed in as <span className="font-medium text-zinc-300">{currentUserEmail}</span>
+            <p className="hidden text-[11px] text-zinc-500 sm:block">
+              <span className="text-zinc-600">Signed in as </span>
+              <span className="font-medium text-zinc-300">{currentUserEmail}</span>
             </p>
           ) : null}
-          <Button
-            className="h-10 bg-white/10 text-zinc-200 hover:bg-white/15"
+          <button
             onClick={handleRefresh}
             disabled={isRefreshing}
+            className="rounded-lg border border-white/10 p-1.5 text-zinc-500 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
           >
-            <RefreshCw className={cn("mr-2 h-4 w-4", isRefreshing && "animate-spin")} />
-            {isRefreshing ? "Refreshing…" : "Refresh"}
-          </Button>
+            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+          </button>
         </div>
       </div>
 
       {/* ── Welcome Card ── */}
-      <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.05] to-transparent p-6">
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-lg font-semibold text-white">
+      <div className="shrink-0 rounded-xl border border-white/10 bg-gradient-to-br from-white/[0.05] to-transparent p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/10 text-sm font-semibold text-white">
             {currentUserName.charAt(0).toUpperCase() || "I"}
           </div>
           <div>
-            <p className="text-lg font-medium text-white">
+            <p className="text-sm font-medium text-white">
               Welcome back, {currentUserName || "IT Staff"}
             </p>
-            <p className="text-sm text-zinc-400">
+            <p className="text-xs text-zinc-500">
               {stats
-                ? `You have ${stats.myActive} active ticket${stats.myActive !== 1 ? "s" : ""} assigned to you`
+                ? `You have ${stats.myActive} active ticket${stats.myActive !== 1 ? "s" : ""} assigned`
                 : "Loading your status…"}
             </p>
           </div>
@@ -300,161 +287,159 @@ export default function ItStaffDashboard() {
 
       {/* ── Error Banner ── */}
       {error ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4">
-          <AlertCircle className="h-5 w-5 shrink-0 text-rose-400" />
-          <p className="text-sm leading-relaxed text-rose-200">{error}</p>
+        <div className="flex shrink-0 items-center gap-2.5 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-2.5 text-sm text-rose-200">
+          <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+          <span>{error}</span>
         </div>
       ) : null}
 
-      {/* ── Stats Grid ── */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="animate-pulse rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-              <div className="h-3 w-20 rounded bg-white/10" />
-              <div className="mt-3 h-8 w-16 rounded bg-white/10" />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            label="Open tickets"
-            value={stats?.totalOpen ?? 0}
-            icon={<Inbox className="h-5 w-5" />}
-            accent="emerald"
-            subtext="Open / Acknowledged / In Progress"
-          />
-          <StatCard
-            label="Unassigned"
-            value={stats?.unassigned ?? 0}
-            icon={<Activity className="h-5 w-5" />}
-            accent="amber"
-            subtext="Awaiting IT staff assignment"
-          />
-          <StatCard
-            label="My active tickets"
-            value={stats?.myActive ?? 0}
-            icon={<TicketCheck className="h-5 w-5" />}
-            accent="sky"
-            subtext="Resolved + Closed excluded"
-          />
-          <StatCard
-            label="SLA breaches"
-            value={stats?.slaBreached ?? 0}
-            icon={<AlertTriangle className="h-5 w-5" />}
-            accent="rose"
-            subtext="Ack or Resolution deadline missed"
-          />
-        </div>
-      )}
-
-      {/* ── Breakdown Panels ── */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Status Breakdown */}
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] uppercase tracking-widest text-zinc-500">Tickets by Status</p>
-              <p className="mt-1 text-xs text-zinc-400">{totalTickets} total</p>
-            </div>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5">
-              <TrendingUp className="h-4 w-4 text-zinc-400" />
-            </div>
+      {/* ── Scrollable content area ── */}
+      <div className="min-h-0 flex-1 overflow-y-auto space-y-3">
+        {/* ── Stats Grid ── */}
+        {isLoading ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="animate-pulse rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="h-3 w-16 rounded bg-white/10" />
+                <div className="mt-2 h-7 w-12 rounded bg-white/10" />
+              </div>
+            ))}
           </div>
-          <div className="mt-5 space-y-3">
-            {statusBreakdown.length > 0 ? (
-              statusBreakdown.map((item) => (
-                <div key={item.key} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-zinc-300">{item.label}</span>
-                    <span className="font-medium text-zinc-100">{item.count}</span>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label="Open tickets"
+              value={stats?.totalOpen ?? 0}
+              icon={<Inbox className="h-4 w-4" />}
+              accent="emerald"
+              subtext="Open / Acknowledged / In Progress"
+            />
+            <StatCard
+              label="Unassigned"
+              value={stats?.unassigned ?? 0}
+              icon={<Activity className="h-4 w-4" />}
+              accent="amber"
+              subtext="Awaiting IT staff assignment"
+            />
+            <StatCard
+              label="My active tickets"
+              value={stats?.myActive ?? 0}
+              icon={<TicketCheck className="h-4 w-4" />}
+              accent="sky"
+              subtext="Resolved + Closed excluded"
+            />
+            <StatCard
+              label="SLA breaches"
+              value={stats?.slaBreached ?? 0}
+              icon={<AlertTriangle className="h-4 w-4" />}
+              accent="rose"
+              subtext="Ack or Resolution deadline missed"
+            />
+          </div>
+        )}
+
+        {/* ── Breakdown Panels ── */}
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {/* Status Breakdown */}
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-zinc-500">Tickets by Status</p>
+                <p className="text-[10px] text-zinc-500">{totalTickets} total</p>
+              </div>
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5">
+                <TrendingUp className="h-3.5 w-3.5 text-zinc-400" />
+              </div>
+            </div>
+            <div className="mt-3 space-y-2.5">
+              {statusBreakdown.length > 0 ? (
+                statusBreakdown.map((item) => (
+                  <div key={item.key} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-zinc-400">{item.label}</span>
+                      <span className="font-medium text-zinc-200">{item.count}</span>
+                    </div>
+                    <ProgressBar value={item.count} max={totalTickets} color={item.color} />
                   </div>
-                  <ProgressBar value={item.count} max={totalTickets} color={item.color} />
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-zinc-500">No tickets yet.</p>
-            )}
+                ))
+              ) : (
+                <p className="text-xs text-zinc-500">No tickets yet.</p>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Priority Breakdown */}
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] uppercase tracking-widest text-zinc-500">Tickets by Priority</p>
-              <p className="mt-1 text-xs text-zinc-400">{totalTickets} total</p>
+          {/* Priority Breakdown */}
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-zinc-500">Tickets by Priority</p>
+                <p className="text-[10px] text-zinc-500">{totalTickets} total</p>
+              </div>
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5">
+                <AlertTriangle className="h-3.5 w-3.5 text-zinc-400" />
+              </div>
             </div>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5">
-              <AlertTriangle className="h-4 w-4 text-zinc-400" />
-            </div>
-          </div>
-          <div className="mt-5 space-y-3">
-            {priorityBreakdown.length > 0 ? (
-              priorityBreakdown.map((item) => (
-                <div key={item.key} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2">
+            <div className="mt-3 space-y-2.5">
+              {priorityBreakdown.length > 0 ? (
+                priorityBreakdown.map((item) => (
+                  <div key={item.key} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
                       <span className={cn(
                         "inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wider",
                         priorityColors[item.key as TicketPriority] || "border-white/10 bg-white/5 text-zinc-400",
                       )}>
                         {item.label}
                       </span>
-                    </span>
-                    <span className="font-medium text-zinc-100">{item.count}</span>
+                      <span className="font-medium text-zinc-200">{item.count}</span>
+                    </div>
+                    <ProgressBar value={item.count} max={totalTickets} color={item.color} />
                   </div>
-                  <ProgressBar value={item.count} max={totalTickets} color={item.color} />
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-zinc-500">No tickets yet.</p>
-            )}
+                ))
+              ) : (
+                <p className="text-xs text-zinc-500">No tickets yet.</p>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* ── Quick Actions ── */}
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-        <div className="flex items-center justify-between">
-          <div>
+        {/* ── Quick Actions ── */}
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="flex items-center justify-between">
             <p className="text-[10px] uppercase tracking-widest text-zinc-500">Quick Actions</p>
-            <p className="mt-1 text-xs text-zinc-400">Common operational tasks</p>
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5">
+              <Clock className="h-3.5 w-3.5 text-zinc-400" />
+            </div>
           </div>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5">
-            <Clock className="h-4 w-4 text-zinc-400" />
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <Link href="/it-staff/tickets?view=unassigned">
+              <div className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/10">
+                <Inbox className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+                <span className="flex-1">Unassigned tickets</span>
+                <ArrowRight className="h-3 w-3 shrink-0 text-zinc-500" />
+              </div>
+            </Link>
+            <Link href="/it-staff/tickets?view=my-tickets">
+              <div className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/10">
+                <TicketCheck className="h-3.5 w-3.5 shrink-0 text-sky-400" />
+                <span className="flex-1">My tickets</span>
+                <ArrowRight className="h-3 w-3 shrink-0 text-zinc-500" />
+              </div>
+            </Link>
+            <Link href="/it-staff/assets">
+              <div className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/10">
+                <Users className="h-3.5 w-3.5 shrink-0 text-indigo-400" />
+                <span className="flex-1">Manage assets</span>
+                <ArrowRight className="h-3 w-3 shrink-0 text-zinc-500" />
+              </div>
+            </Link>
+            <Link href="/it-staff/tickets">
+              <div className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/10">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                <span className="flex-1">All tickets</span>
+                <ArrowRight className="h-3 w-3 shrink-0 text-zinc-500" />
+              </div>
+            </Link>
           </div>
-        </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Link href="/it-staff/tickets?view=unassigned">
-            <div className="flex cursor-pointer items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-zinc-200 transition hover:border-white/20 hover:bg-white/10">
-              <Inbox className="h-4 w-4 shrink-0 text-amber-400" />
-              <span className="flex-1">View unassigned tickets</span>
-              <ArrowRight className="h-4 w-4 shrink-0 text-zinc-500" />
-            </div>
-          </Link>
-          <Link href="/it-staff/tickets?view=my-tickets">
-            <div className="flex cursor-pointer items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-zinc-200 transition hover:border-white/20 hover:bg-white/10">
-              <TicketCheck className="h-4 w-4 shrink-0 text-sky-400" />
-              <span className="flex-1">My tickets</span>
-              <ArrowRight className="h-4 w-4 shrink-0 text-zinc-500" />
-            </div>
-          </Link>
-          <Link href="/it-staff/assets">
-            <div className="flex cursor-pointer items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-zinc-200 transition hover:border-white/20 hover:bg-white/10">
-              <Users className="h-4 w-4 shrink-0 text-indigo-400" />
-              <span className="flex-1">Manage assets</span>
-              <ArrowRight className="h-4 w-4 shrink-0 text-zinc-500" />
-            </div>
-          </Link>
-          <Link href="/it-staff/tickets">
-            <div className="flex cursor-pointer items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-zinc-200 transition hover:border-white/20 hover:bg-white/10">
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-              <span className="flex-1">All tickets</span>
-              <ArrowRight className="h-4 w-4 shrink-0 text-zinc-500" />
-            </div>
-          </Link>
         </div>
       </div>
     </section>

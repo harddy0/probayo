@@ -13,6 +13,7 @@ import {
   HardDrive,
   Tags,
   UserRound,
+  Users,
 } from "lucide-react";
 import { logout } from "@/lib/api/auth";
 import { getAuthSession } from "@/lib/api/client";
@@ -195,6 +196,26 @@ export default function AdminLayout({
                 )}
               >
                 Assets
+              </span>
+            </Link>
+
+            <Link
+              href="/admin/users"
+              className={cn(
+                "group relative flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition",
+                pathname === "/admin/users"
+                  ? "bg-white/10 text-white"
+                  : "text-zinc-400 hover:bg-white/5",
+              )}
+            >
+              <Users className="h-5 w-5 shrink-0" />
+              <span
+                className={cn(
+                  "transition-all duration-300",
+                  isCollapsed && "w-0 overflow-hidden",
+                )}
+              >
+                Users
               </span>
             </Link>
 

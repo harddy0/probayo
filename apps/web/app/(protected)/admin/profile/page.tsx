@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
-  BadgeCheck,
   Building2,
   CircleUserRound,
   IdCard,
@@ -12,13 +11,6 @@ import {
 } from "lucide-react";
 import { fetchProfile } from "@/lib/api/auth";
 import type { UserProfile } from "@/lib/types/auth";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import EditProfileModal from "@/components/profile/edit-profile-modal";
 
 type ProfileState = {
@@ -60,114 +52,157 @@ export default function AdminProfilePage() {
     };
   }, []);
 
+  // ── Loading / Error / Empty ──
+
   if (state.isLoading) {
-    return <p className="text-sm text-zinc-400">Loading profile...</p>;
+    return (
+      <section className="flex h-full flex-col gap-3">
+        <div className="flex shrink-0 items-center gap-3">
+          <div className="h-8 w-8 animate-pulse rounded-lg bg-white/10" />
+          <div className="space-y-2">
+            <div className="h-4 w-40 animate-pulse rounded bg-white/10" />
+            <div className="h-3 w-24 animate-pulse rounded bg-white/5" />
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+          <div className="flex h-full items-center justify-center gap-2.5 text-sm text-zinc-500">Loading…</div>
+        </div>
+      </section>
+    );
   }
 
   if (state.error) {
-    return <p className="text-sm text-rose-400">{state.error}</p>;
+    return (
+      <section className="flex h-full flex-col gap-3">
+        <div className="flex shrink-0 items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/10">
+            <CircleUserRound className="h-4 w-4 text-white" />
+          </div>
+          <h1 className="text-lg font-semibold text-white">Profile</h1>
+        </div>
+        <div className="flex shrink-0 items-center gap-2.5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">
+          {state.error}
+        </div>
+      </section>
+    );
   }
 
   if (!state.data) {
-    return <p className="text-sm text-zinc-400">No profile data.</p>;
+    return (
+      <section className="flex h-full flex-col gap-3">
+        <div className="flex shrink-0 items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/10">
+            <CircleUserRound className="h-4 w-4 text-white" />
+          </div>
+          <h1 className="text-lg font-semibold text-white">Profile</h1>
+        </div>
+        <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+          <div className="flex h-full items-center justify-center text-sm text-zinc-500">No profile data.</div>
+        </div>
+      </section>
+    );
   }
 
+  const profile = state.data;
+  const displayName = profile.firstName
+    ? `${profile.firstName} ${profile.lastName ?? ""}`.trim()
+    : profile.email;
+
   return (
-    <section className="space-y-8 pb-24">
-      <div className="flex items-center justify-between gap-4">
+    <section className="flex h-full flex-col gap-3">
+      {/* ── Compact header ── */}
+      <div className="flex shrink-0 items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white">
-            <CircleUserRound className="h-6 w-6" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/10">
+            <CircleUserRound className="h-4 w-4 text-white" />
           </div>
           <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-zinc-500">
-              Profile
-            </p>
-            <h1 className="mt-1 text-3xl font-semibold text-white">
-              {state.data.firstName
-                ? `${state.data.firstName} ${state.data.lastName ?? ""}`
-                : state.data.role}
-            </h1>
+            <h1 className="text-lg font-semibold text-white">{displayName}</h1>
+            <p className="text-xs text-zinc-500">Your account information</p>
           </div>
         </div>
-        <Button
-          className="bg-zinc-800 text-zinc-50 hover:bg-zinc-700"
-          onClick={() => setIsEditing(true)}
-        >
-          <Pencil className="mr-2 h-4 w-4" />
-          Edit profile
-        </Button>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider text-zinc-300">
+            {profile.role}
+          </span>
+          <button
+            onClick={() => setIsEditing(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-zinc-100"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </button>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="border-white/10 bg-white/5 md:col-span-2">
-          <CardHeader>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-zinc-500">
-              <BadgeCheck className="h-3.5 w-3.5" />
-              Profile data
-            </div>
-            <CardTitle>{state.data.firstName || state.data.email}</CardTitle>
-            <CardDescription>
-              Basic account information from the backend.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-
-        <Card className="border-white/10 bg-white/5">
-          <CardHeader>
-            <CardDescription className="flex items-center gap-2 text-zinc-400">
-              <IdCard className="h-4 w-4" />
-              User ID
-            </CardDescription>
-            <CardTitle className="text-lg break-all">{state.data.id}</CardTitle>
-          </CardHeader>
-        </Card>
-
-        <Card className="border-white/10 bg-white/5">
-          <CardHeader>
-            <CardDescription className="flex items-center gap-2 text-zinc-400">
-              <Mail className="h-4 w-4" />
-              Email
-            </CardDescription>
-            <CardTitle className="text-lg break-all">
-              {state.data.email}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-
-        <Card className="border-white/10 bg-white/5">
-          <CardHeader>
-            <CardDescription className="flex items-center gap-2 text-zinc-400">
-              <Shield className="h-4 w-4" />
-              Role
-            </CardDescription>
-            <CardTitle className="text-lg">{state.data.role}</CardTitle>
-          </CardHeader>
-        </Card>
-
-        {state.data.departmentId ? (
-          <Card className="border-white/10 bg-white/5">
-            <CardHeader>
-              <CardDescription className="flex items-center gap-2 text-zinc-400">
-                <Building2 className="h-4 w-4" />
-                Department ID
-              </CardDescription>
-              <CardTitle className="text-lg break-all">
-                {state.data.departmentId}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-        ) : null}
+      {/* ── Info grid ── */}
+      <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+        <div className="h-full overflow-auto">
+          <div className="divide-y divide-white/5">
+            {/* ID */}
+            <InfoRow
+              icon={<IdCard className="h-4 w-4 text-zinc-400" />}
+              label="User ID"
+              value={profile.id}
+            />
+            {/* Email */}
+            <InfoRow
+              icon={<Mail className="h-4 w-4 text-zinc-400" />}
+              label="Email"
+              value={profile.email}
+            />
+            {/* Role */}
+            <InfoRow
+              icon={<Shield className="h-4 w-4 text-zinc-400" />}
+              label="Role"
+              value={profile.role}
+            />
+            {/* Department */}
+            {profile.departmentId && (
+              <InfoRow
+                icon={<Building2 className="h-4 w-4 text-zinc-400" />}
+                label="Department ID"
+                value={profile.departmentId}
+              />
+            )}
+          </div>
+        </div>
       </div>
 
       <EditProfileModal
         open={isEditing}
-        profile={state.data}
+        profile={profile}
         onClose={() => setIsEditing(false)}
         onUpdated={(updated) =>
           setState((current) => ({ ...current, data: updated }))
         }
       />
     </section>
+  );
+}
+
+function InfoRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center gap-4 bg-white/[0.02] px-4 py-3 transition hover:bg-white/[0.05]">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10">
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-500">
+          {label}
+        </p>
+        <p className="mt-0.5 truncate text-sm font-medium text-zinc-100">
+          {value}
+        </p>
+      </div>
+    </div>
   );
 }
