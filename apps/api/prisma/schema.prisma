@@ -169,6 +169,8 @@ model Ticket {
   status                TicketStatus
   knownIssueId          String?       @map("known_issue_id") @db.Char(36)
   knownIssue            KnownIssue?   @relation(fields: [knownIssueId], references: [id], onDelete: SetNull)
+  slaAckMinutes         Int?          @map("sla_ack_minutes")
+  slaResolutionMinutes  Int?          @map("sla_resolution_minutes")
   slaAckDeadline        DateTime      @map("sla_ack_deadline") @db.DateTime(0)
   slaResolutionDeadline DateTime      @map("sla_resolution_deadline") @db.DateTime(0)
   slaPausedAt           DateTime?     @map("sla_paused_at") @db.DateTime(0)

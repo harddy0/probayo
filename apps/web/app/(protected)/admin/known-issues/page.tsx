@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   AlertTriangle,
@@ -9,6 +9,8 @@ import {
   Loader,
   Pencil,
   Plus,
+  RefreshCw,
+  Search,
   Trash2,
   X,
 } from "lucide-react";
@@ -30,13 +32,12 @@ const statusColors: Record<string, string> = {
   Resolved: "border-emerald-500/25 bg-emerald-500/10 text-emerald-300",
 };
 
-// ── Page ──
-
 export default function AdminKnownIssuesPage() {
   const [issues, setIssues] = useState<KnownIssue[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Modal state
   const [modal, setModal] = useState<{
@@ -68,6 +69,33 @@ export default function AdminKnownIssuesPage() {
     void loadIssues();
   }, [loadIssues]);
 
+  // ── Derived ──
+
+  const filteredIssues = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return issues;
+    return issues.filter((i) =>
+      i.title.toLowerCase().includes(q) ||
+      i.description.toLowerCase().includes(q),
+    );
+  }, [issues, searchQuery]);
+
+  const activeIssues = useMemo(
+    () => filteredIssues.filter((i) => i.status === "Active"),
+    [filteredIssues],
+  );
+  const resolvedIssues = useMemo(
+    () => filteredIssues.filter((i) => i.status === "Resolved"),
+    [filteredIssues],
+  );
+
+  const issueStats = useMemo(() => {
+    const total = issues.length;
+    const active = issues.filter((i) => i.status === "Active").length;
+    const resolved = total - active;
+    return { total, active, resolved };
+  }, [issues]);
+
   // ── Handlers ──
 
   const openCreate = () => {
@@ -90,6 +118,15 @@ export default function AdminKnownIssuesPage() {
     setFormData({ title: "", description: "" });
     setError(null);
   };
+
+  // Escape key closes modal
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeModal();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [closeModal]);
 
   const handleSubmit = async () => {
     if (!formData.title.trim()) {
@@ -161,148 +198,169 @@ export default function AdminKnownIssuesPage() {
     }
   };
 
-  const activeIssues = issues.filter((i) => i.status === "Active");
-  const resolvedIssues = issues.filter((i) => i.status === "Resolved");
+  const hasContent = filteredIssues.length > 0;
 
   // ── Render ──
 
   return (
-    <section className="mx-auto max-w-5xl space-y-6 pb-24">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <div className="mb-1.5 flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-white/10">
-              <AlertTriangle className="h-3.5 w-3.5 text-white" />
-            </div>
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-              Maintenance
-            </span>
+    <section className="flex h-full flex-col gap-3">
+      {/* ── Ultra-compact header ── */}
+      <div className="flex shrink-0 items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/10">
+            <AlertTriangle className="h-4 w-4 text-white" />
           </div>
-          <h1 className="text-[22px] font-medium tracking-tight text-white">
-            Known Issues
-          </h1>
-          <p className="mt-1 text-sm text-zinc-400">
-            Track and manage known system issues for ticket deflection.
-          </p>
-        </div>
-        <button
-          onClick={openCreate}
-          className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3.5 text-sm font-medium text-zinc-950 transition hover:bg-zinc-100"
-        >
-          <Plus className="h-4 w-4" />
-          New issue
-        </button>
-      </div>
-
-      {/* Error */}
-      {error ? (
-        <div className="flex items-center gap-2.5 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3.5 py-2.5">
-          <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
-          <p className="text-sm text-rose-200">{error}</p>
-        </div>
-      ) : null}
-
-      {/* Content */}
-      {isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className="flex animate-pulse items-center gap-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3"
-            >
-              <div className="h-4 w-4 rounded bg-white/10" />
-              <div className="h-4 w-48 rounded bg-white/10" />
-              <div className="ml-auto h-4 w-20 rounded bg-white/5" />
-            </div>
-          ))}
-        </div>
-      ) : issues.length === 0 ? (
-        /* Empty state */
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] px-6 py-12">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5">
-            <AlertTriangle className="h-5 w-5 text-zinc-500" />
+          <div>
+            <h1 className="text-lg font-semibold text-white">Known Issues</h1>
+            <p className="text-xs text-zinc-500">Track known system issues for ticket deflection.</p>
           </div>
-          <p className="text-sm font-medium text-zinc-300">
-            No known issues yet
-          </p>
-          <p className="text-xs text-zinc-500">
-            Create your first known issue to help deflect incoming tickets.
-          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="hidden items-center gap-2 sm:flex">
+            <StatPill label="Total" value={issueStats.total} />
+            <div className="h-4 w-px bg-white/10" />
+            <StatPill label="Active" value={issueStats.active} className="text-amber-400" />
+            <div className="h-4 w-px bg-white/10" />
+            <StatPill label="Resolved" value={issueStats.resolved} className="text-emerald-400" />
+          </div>
+          <button
+            onClick={loadIssues}
+            className="rounded-lg border border-white/10 p-1.5 text-zinc-500 transition hover:bg-white/10 hover:text-white"
+          >
+            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+          </button>
           <button
             onClick={openCreate}
-            className="mt-1 inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold text-zinc-950 transition hover:bg-zinc-100"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-zinc-100"
           >
             <Plus className="h-3.5 w-3.5" />
-            Create issue
+            New
           </button>
         </div>
-      ) : (
-        <div className="space-y-6">
-          {/* Active issues */}
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <AlertCircle className="h-3.5 w-3.5 text-amber-400" />
-              <span className="text-xs font-medium text-zinc-400">
-                Active ({activeIssues.length})
-              </span>
-            </div>
-            <div className="overflow-hidden rounded-xl border border-white/10">
-              {activeIssues.map((issue, idx) => (
-                <IssueRow
-                  key={issue.id}
-                  issue={issue}
-                  onEdit={() => openEdit(issue)}
-                  onResolve={() => handleResolve(issue.id)}
-                  onDelete={() => handleDelete(issue.id)}
-                  isLast={idx === activeIssues.length - 1}
-                />
-              ))}
-            </div>
-          </div>
+      </div>
 
-          {/* Resolved issues */}
-          {resolvedIssues.length > 0 ? (
-            <div>
-              <div className="mb-2 flex items-center gap-2">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                <span className="text-xs font-medium text-zinc-500">
-                  Resolved ({resolvedIssues.length})
-                </span>
-              </div>
-              <div className="overflow-hidden rounded-xl border border-zinc-800/60 opacity-60">
-                {resolvedIssues.map((issue, idx) => (
-                  <IssueRow
-                    key={issue.id}
-                    issue={issue}
-                    onEdit={() => openEdit(issue)}
-                    onResolve={() => handleResolve(issue.id)}
-                    onDelete={() => handleDelete(issue.id)}
-                    isLast={idx === resolvedIssues.length - 1}
-                  />
-                ))}
-              </div>
-            </div>
-          ) : null}
+      {/* ── Compact search bar ── */}
+      <div className="relative flex shrink-0 items-center gap-2.5 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5">
+        <Search className="h-4 w-4 shrink-0 text-zinc-500" />
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search known issues by title or description…"
+          className="min-w-0 flex-1 bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="shrink-0 rounded-md p-0.5 text-zinc-500 transition hover:text-white"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      {/* ── Error ── */}
+      {error && (
+        <div className="flex shrink-0 items-center gap-2.5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">
+          <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
+          <span>{error}</span>
         </div>
       )}
 
-      {/* ── Create / Edit Modal ── */}
-      {modal.type ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeModal();
-          }}
-        >
-          <div className="w-full max-w-[600px] rounded-xl border border-white/10 bg-zinc-900 shadow-2xl">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3.5">
+      {/* ── Content (fills remaining height, scrolls internally) ── */}
+      <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+        {isLoading ? (
+          <div className="flex h-full items-center justify-center gap-2.5 text-sm text-zinc-500">
+            <Loader className="h-4 w-4 animate-spin" />
+            Loading…
+          </div>
+        ) : !hasContent ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
+            <AlertTriangle className="h-8 w-8 text-zinc-600" />
+            <p className="text-sm font-medium text-zinc-300">
+              {searchQuery ? "No matches" : "No known issues yet"}
+            </p>
+            <p className="text-xs text-zinc-500">
+              {searchQuery ? "Try a different keyword." : "Create your first known issue to help deflect incoming tickets."}
+            </p>
+            {searchQuery ? (
+              <button onClick={() => setSearchQuery("")} className="mt-2 h-8 rounded-lg bg-zinc-800 px-3 text-xs text-zinc-50 hover:bg-zinc-700">
+                Clear search
+              </button>
+            ) : (
+              <button onClick={openCreate} className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold text-zinc-950 hover:bg-zinc-100">
+                <Plus className="h-3.5 w-3.5" />
+                Create issue
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="h-full overflow-auto">
+            {/* Active issues */}
+            {activeIssues.length > 0 && (
               <div>
-                <h2 className="text-base font-medium text-white">
+                <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-white/5 bg-zinc-900/95 px-4 py-2 backdrop-blur-sm">
+                  <AlertCircle className="h-3.5 w-3.5 text-amber-400" />
+                  <span className="text-xs font-medium text-zinc-400">
+                    Active ({activeIssues.length})
+                  </span>
+                </div>
+                <div className="divide-y divide-white/5">
+                  {activeIssues.map((issue) => (
+                    <IssueRow
+                      key={issue.id}
+                      issue={issue}
+                      onEdit={() => openEdit(issue)}
+                      onResolve={() => handleResolve(issue.id)}
+                      onDelete={() => handleDelete(issue.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Resolved issues */}
+            {resolvedIssues.length > 0 && (
+              <div className="opacity-60">
+                <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-white/5 bg-zinc-900/95 px-4 py-2 backdrop-blur-sm">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                  <span className="text-xs font-medium text-zinc-500">
+                    Resolved ({resolvedIssues.length})
+                  </span>
+                </div>
+                <div className="divide-y divide-white/5">
+                  {resolvedIssues.map((issue) => (
+                    <IssueRow
+                      key={issue.id}
+                      issue={issue}
+                      onEdit={() => openEdit(issue)}
+                      onResolve={() => handleResolve(issue.id)}
+                      onDelete={() => handleDelete(issue.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Create / Edit Modal ── */}
+      {modal.type && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-3.5">
+              <div>
+                <h2 className="text-base font-semibold text-white">
                   {modal.type === "edit" ? "Edit issue" : "New known issue"}
                 </h2>
-                <p className="mt-0.5 text-xs text-zinc-500">
+                <p className="mt-0.5 text-xs text-zinc-400">
                   {modal.type === "edit"
                     ? "Update the issue details below."
                     : "Document a new known issue for ticket deflection."}
@@ -311,7 +369,7 @@ export default function AdminKnownIssuesPage() {
               <button
                 onClick={closeModal}
                 disabled={isSubmitting}
-                className="shrink-0 rounded-lg p-1.5 text-zinc-500 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+                className="rounded-full p-1.5 text-zinc-500 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -319,69 +377,58 @@ export default function AdminKnownIssuesPage() {
 
             {/* Body */}
             <div className="space-y-4 px-5 py-4">
-              {error ? (
-                <div className="flex items-center gap-2 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
-                  <p className="text-sm text-rose-200">{error}</p>
+              {error && (
+                <div className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-red-400" />
+                  <p className="text-sm text-red-200">{error}</p>
                 </div>
-              ) : null}
+              )}
 
-              <div className="space-y-2">
-                <Label htmlFor="ki-title">Title</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-zinc-400">Title</Label>
                 <Input
-                  id="ki-title"
                   placeholder="e.g. Login timeout on Safari"
                   value={formData.title}
-                  onChange={(e) =>
-                    setFormData((p) => ({ ...p, title: e.target.value }))
-                  }
+                  onChange={(e) => setFormData((p) => ({ ...p, title: e.target.value }))}
                   disabled={isSubmitting}
+                  className="h-9 rounded-lg text-sm"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="ki-desc">Description</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-zinc-400">Description</Label>
                 <textarea
-                  id="ki-desc"
                   rows={4}
                   placeholder="Describe the issue, affected systems, and known workarounds…"
                   value={formData.description}
-                  onChange={(e) =>
-                    setFormData((p) => ({ ...p, description: e.target.value }))
-                  }
+                  onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))}
                   disabled={isSubmitting}
-                  className="flex w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-zinc-50 outline-none transition placeholder:text-zinc-500 hover:border-white/20 focus:border-white/30 focus:ring-2 focus:ring-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex w-full rounded-lg border border-white/10 bg-white/5 px-3.5 py-2 text-sm text-zinc-50 outline-none transition placeholder:text-zinc-500 hover:border-white/20 focus:border-white/30 focus:ring-2 focus:ring-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end gap-2.5 border-t border-white/[0.06] px-5 py-3.5">
+            <div className="flex items-center justify-end gap-2.5 border-t border-zinc-800 px-5 py-3.5">
               <button
                 onClick={closeModal}
                 disabled={isSubmitting}
-                className="h-8 rounded-lg border border-white/10 px-3 text-sm text-zinc-300 transition hover:bg-white/10 disabled:opacity-50"
+                className="h-9 rounded-lg border border-white/10 px-3.5 text-sm text-zinc-300 transition hover:bg-white/10 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={
-                  isSubmitting ||
-                  !formData.title.trim() ||
-                  !formData.description.trim()
-                }
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3.5 text-sm font-medium text-zinc-950 transition hover:bg-zinc-100 disabled:opacity-50"
+                disabled={isSubmitting || !formData.title.trim() || !formData.description.trim()}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-white px-4 text-sm font-semibold text-zinc-950 transition hover:bg-zinc-100 disabled:opacity-50"
               >
-                {isSubmitting ? (
-                  <Loader className="h-3.5 w-3.5 animate-spin" />
-                ) : null}
+                {isSubmitting ? <Loader className="h-3.5 w-3.5 animate-spin" /> : null}
                 {modal.type === "edit" ? "Update" : "Create"}
               </button>
             </div>
           </div>
         </div>
-      ) : null}
+      )}
     </section>
   );
 }
@@ -393,22 +440,15 @@ function IssueRow({
   onEdit,
   onResolve,
   onDelete,
-  isLast,
 }: {
   issue: KnownIssue;
   onEdit: () => void;
   onResolve: () => void;
   onDelete: () => void;
-  isLast: boolean;
 }) {
   const isResolved = issue.status === "Resolved";
   return (
-    <div
-      className={cn(
-        "group flex items-center gap-4 bg-white/[0.02] px-4 py-2.5 transition hover:bg-white/[0.05]",
-        !isLast && "border-b border-white/[0.06]",
-      )}
-    >
+    <div className="group flex items-center gap-4 bg-white/[0.02] px-4 py-2.5 transition hover:bg-white/[0.05]">
       {/* Icon */}
       <div
         className={cn(
@@ -440,11 +480,11 @@ function IssueRow({
             {issue.status}
           </span>
         </div>
-        {issue.description ? (
+        {issue.description && (
           <p className="mt-0.5 line-clamp-1 text-xs text-zinc-500">
             {issue.description}
           </p>
-        ) : null}
+        )}
       </div>
 
       {/* Created date */}
@@ -454,7 +494,7 @@ function IssueRow({
 
       {/* Actions */}
       <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
-        {!isResolved ? (
+        {!isResolved && (
           <button
             onClick={onResolve}
             title="Mark as resolved"
@@ -462,7 +502,7 @@ function IssueRow({
           >
             <CheckCircle2 className="h-3.5 w-3.5" />
           </button>
-        ) : null}
+        )}
         <button
           onClick={onEdit}
           className="rounded-lg p-1.5 text-zinc-500 transition hover:bg-white/10 hover:text-white"
@@ -476,6 +516,15 @@ function IssueRow({
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
+    </div>
+  );
+}
+
+function StatPill({ label, value, className }: { label: string; value: number | string; className?: string }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[11px] uppercase tracking-[0.15em] text-zinc-500">{label}</span>
+      <span className={cn("text-sm font-semibold tabular-nums text-white", className)}>{value}</span>
     </div>
   );
 }

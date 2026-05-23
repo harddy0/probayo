@@ -34,3 +34,8 @@ export type UserProfile = {
   lastName?: string;
   departmentId?: string;
 };
+
+export type ChangePasswordPayload = {
+  currentPassword: string;
+  newPassword: string;
+};

@@ -12,12 +12,18 @@ export type SimpleUser = {
   email: string;
   firstName?: string;
   lastName?: string;
+  role: string;
+  isActive: boolean;
+  departmentId?: string | null;
 };
 
 export type UpdateUserProfilePayload = {
   firstName?: string;
   lastName?: string;
-  departmentId?: string;
+};
+
+export type UpdateUserStatusPayload = {
+  isActive: boolean;
 };
 
 export const fetchAllUsers = async (): Promise<SimpleUser[]> => {
@@ -30,6 +36,55 @@ export const updateUserProfile = async (
 ): Promise<UserProfile> => {
   return request<UserProfile>(`/users/${userId}`, {
     method: "PATCH",
+    body: payload,
+  });
+};
+
+/**
+ * Update a user's active/inactive status.
+ * Calls PATCH /users/{id}/status with { isActive }.
+ */
+export const updateUserStatus = async (
+  userId: string,
+  payload: UpdateUserStatusPayload,
+): Promise<void> => {
+  return request<void>(`/users/${userId}/status`, {
+    method: "PATCH",
+    body: payload,
+  });
+};
+
+/**
+ * Reset a user's password to the default value (12345678password).
+ * Calls POST /users/{id}/reset-password.
+ */
+export const resetUserPassword = async (userId: string): Promise<void> => {
+  return request<void>(`/users/${userId}/reset-password`, {
+    method: "POST",
+  });
+};
+
+/**
+ * Payload for creating a new user.
+ * Matches the backend's CreateUserDto schema.
+ */
+export type CreateUserPayload = {
+  email: string;
+  passwordHash: string;
+  firstName: string;
+  lastName: string;
+  role: "Admin" | "ItStaff" | "Employee" | "DepartmentHead";
+  departmentId?: string | null;
+  isActive?: boolean;
+};
+
+/**
+ * Create a new user.
+ * Calls POST /users with the user data.
+ */
+export const createUser = async (payload: CreateUserPayload): Promise<SimpleUser> => {
+  return request<SimpleUser>("/users", {
+    method: "POST",
     body: payload,
   });
 };

@@ -7,7 +7,7 @@
  */
 
 import { clearAuthSession, request, setAuthSession } from "./client";
-import type { AuthIdentity, AuthSummary, LoginResponse, UserProfile } from "../types/auth";
+import type { AuthIdentity, AuthSummary, ChangePasswordPayload, LoginResponse, UserProfile } from "../types/auth";
 
 /**
  * Login user with email and password
@@ -66,4 +66,22 @@ export const logout = () => {
  */
 export const fetchProfile = async (): Promise<UserProfile> => {
   return request<UserProfile>("/auth/profile");
+};
+
+/**
+ * Change the current user's password
+ * 
+ * Requires the current password for verification.
+ * Requires an active session (Bearer token).
+ * 
+ * @param payload - Object containing currentPassword and newPassword
+ * @throws ApiError if current password is wrong or request fails
+ */
+export const changePassword = async (
+  payload: ChangePasswordPayload,
+): Promise<void> => {
+  await request("/auth/change-password", {
+    method: "POST",
+    body: payload,
+  });
 };

@@ -5,14 +5,17 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ShieldCheck,
   LayoutDashboard,
   LogOut,
   Building2,
   HardDrive,
   Tags,
   UserRound,
+  Users,
 } from "lucide-react";
 import { logout } from "@/lib/api/auth";
 import { getAuthSession } from "@/lib/api/client";
@@ -26,7 +29,12 @@ export default function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isSlaOpen, setIsSlaOpen] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
+
+  const isSlaActive =
+    pathname === "/admin/sla-policies" ||
+    pathname === "/admin/sla-escalation-rules";
 
   useEffect(() => {
     const session = getAuthSession();
@@ -178,6 +186,73 @@ export default function AdminLayout({
               </span>
             </Link>
 
+            {/* ── SLA parent menu ── */}
+            <div>
+              <button
+                onClick={() => setIsSlaOpen((prev) => !prev)}
+                className={cn(
+                  "group relative flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition",
+                  isSlaActive
+                    ? "bg-white/10 text-white"
+                    : "text-zinc-400 hover:bg-white/5",
+                )}
+              >
+                <ShieldCheck className="h-5 w-5 shrink-0" />
+                <span
+                  className={cn(
+                    "flex-1 text-left transition-all duration-300",
+                    isCollapsed && "w-0 overflow-hidden",
+                  )}
+                >
+                  SLA
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 text-zinc-500 transition-transform duration-200",
+                    isSlaOpen && "rotate-180",
+                    isCollapsed && "hidden",
+                  )}
+                />
+              </button>
+
+              <div
+                className={cn(
+                  "overflow-hidden transition-all duration-300",
+                  isSlaOpen && !isCollapsed
+                    ? "mt-1 max-h-40 opacity-100"
+                    : "max-h-0 opacity-0",
+                )}
+              >
+                <div className="ml-5 border-l border-white/10 pl-4">
+                  <Link
+                    href="/admin/sla-policies"
+                    className={cn(
+                      "group relative flex items-center gap-3 rounded-2xl px-3 py-1.5 text-sm font-medium transition",
+                      pathname === "/admin/sla-policies"
+                        ? "bg-white/10 text-white"
+                        : "text-zinc-400 hover:bg-white/5",
+                    )}
+                  >
+                    <div className="h-1.5 w-1.5 rounded-full bg-current opacity-40" />
+                    <span>Policies</span>
+                  </Link>
+
+                  <Link
+                    href="/admin/sla-escalation-rules"
+                    className={cn(
+                      "group relative flex items-center gap-3 rounded-2xl px-3 py-1.5 text-sm font-medium transition",
+                      pathname === "/admin/sla-escalation-rules"
+                        ? "bg-white/10 text-white"
+                        : "text-zinc-400 hover:bg-white/5",
+                    )}
+                  >
+                    <div className="h-1.5 w-1.5 rounded-full bg-current opacity-40" />
+                    <span>Escalation Rules</span>
+                  </Link>
+                </div>
+              </div>
+            </div>
+
             <Link
               href="/admin/assets"
               className={cn(
@@ -195,6 +270,26 @@ export default function AdminLayout({
                 )}
               >
                 Assets
+              </span>
+            </Link>
+
+            <Link
+              href="/admin/users"
+              className={cn(
+                "group relative flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition",
+                pathname === "/admin/users"
+                  ? "bg-white/10 text-white"
+                  : "text-zinc-400 hover:bg-white/5",
+              )}
+            >
+              <Users className="h-5 w-5 shrink-0" />
+              <span
+                className={cn(
+                  "transition-all duration-300",
+                  isCollapsed && "w-0 overflow-hidden",
+                )}
+              >
+                Users
               </span>
             </Link>
 
