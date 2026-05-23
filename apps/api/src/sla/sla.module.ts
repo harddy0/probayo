@@ -4,6 +4,9 @@ import { BullModule } from '@nestjs/bullmq';
 import { SlaService } from './sla.service';
 import { SlaController } from './sla.controller';
 import { SlaCronService } from './sla-cron.service';
+import { SlaEscalationService } from './sla-escalation.service';
+import { EscalationRulesController } from './escalation-rules.controller';
+import { EscalationRulesService } from './escalation-rules.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { QUEUE_NAMES } from '../queues/constants/queue.constants';
 
@@ -13,8 +16,13 @@ import { QUEUE_NAMES } from '../queues/constants/queue.constants';
     ScheduleModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.MAIL }),
   ],
-  controllers: [SlaController],
-  providers: [SlaService, SlaCronService],
+  controllers: [SlaController, EscalationRulesController],
+  providers: [
+    SlaService,
+    SlaCronService,
+    SlaEscalationService,
+    EscalationRulesService,
+  ],
   exports: [SlaService],
 })
 export class SlaModule {}

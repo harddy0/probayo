@@ -79,24 +79,28 @@ export class TicketsService {
     // 4. Set priority (default to medium if not provided)
     const priority = createTicketDto.priority || PriorityLevel.Medium;
 
-    // 5. Calculate SLA deadlines
-    const deadlines = await this.slaService.calculateDeadlines(priority);
+    // 5. Calculate SLA deadlines and snapshot policy minutes
+    const slaSnapshot = await this.slaService.buildTicketSlaSnapshot(priority);
 
     // 6. Create ticket
+    const ticketData = {
+      title: createTicketDto.title,
+      description: createTicketDto.description,
+      categoryId: createTicketDto.categoryId,
+      assetId: createTicketDto.assetId,
+      knownIssueId: createTicketDto.knownIssueId,
+      priority: priority,
+      status: TicketStatus.Open,
+      filedByUserId: userId,
+      departmentId: user.departmentId,
+      slaAckMinutes: slaSnapshot.acknowledgementMinutes,
+      slaResolutionMinutes: slaSnapshot.resolutionMinutes,
+      slaAckDeadline: slaSnapshot.ackDeadline,
+      slaResolutionDeadline: slaSnapshot.resolutionDeadline,
+    };
+
     const ticket = await this.prisma.ticket.create({
-      data: {
-        title: createTicketDto.title,
-        description: createTicketDto.description,
-        categoryId: createTicketDto.categoryId,
-        assetId: createTicketDto.assetId,
-        knownIssueId: createTicketDto.knownIssueId,
-        priority: priority,
-        status: TicketStatus.Open,
-        filedByUserId: userId,
-        departmentId: user.departmentId,
-        slaAckDeadline: deadlines.ack,
-        slaResolutionDeadline: deadlines.resolution,
-      },
+      data: ticketData,
       include: {
         filedByUser: {
           select: { id: true, email: true, firstName: true, lastName: true },
@@ -323,16 +327,33 @@ export class TicketsService {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         updateData.slaPausedAt = null;
 
-        // Recalculate deadlines
-        const newDeadlines = await this.slaService.calculateDeadlinesWithPause(
+        // Recalculate deadlines using the ticket's snapshot minutes
+        const snapshotMinutes = await this.slaService.resolveSnapshotMinutes(
           existingTicket.priority,
+          existingTicket.slaAckMinutes,
+          existingTicket.slaResolutionMinutes,
+        );
+
+        const deadlines = this.slaService.calculateDeadlinesFromMinutes(
           existingTicket.createdAt,
+          snapshotMinutes.acknowledgementMinutes,
+          snapshotMinutes.resolutionMinutes,
           newTotalPaused,
         );
+
+        if (existingTicket.slaAckMinutes == null) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          updateData.slaAckMinutes = snapshotMinutes.acknowledgementMinutes;
+        }
+        if (existingTicket.slaResolutionMinutes == null) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          updateData.slaResolutionMinutes = snapshotMinutes.resolutionMinutes;
+        }
+
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        updateData.slaAckDeadline = newDeadlines.ack;
+        updateData.slaAckDeadline = deadlines.ack;
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        updateData.slaResolutionDeadline = newDeadlines.resolution;
+        updateData.slaResolutionDeadline = deadlines.resolution;
       }
 
       // Set timestamps based on status

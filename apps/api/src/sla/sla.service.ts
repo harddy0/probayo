@@ -86,20 +86,84 @@ export class SlaService {
     return policy;
   }
 
+  calculateDeadlinesFromMinutes(
+    startDate: Date,
+    acknowledgementMinutes: number,
+    resolutionMinutes: number,
+    totalPausedMinutes = 0,
+  ) {
+    const ackBase = new Date(
+      startDate.getTime() + acknowledgementMinutes * 60 * 1000,
+    );
+    const resolutionBase = new Date(
+      startDate.getTime() + resolutionMinutes * 60 * 1000,
+    );
+
+    if (totalPausedMinutes <= 0) {
+      return {
+        ack: ackBase,
+        resolution: resolutionBase,
+      };
+    }
+
+    return {
+      ack: new Date(ackBase.getTime() + totalPausedMinutes * 60 * 1000),
+      resolution: new Date(
+        resolutionBase.getTime() + totalPausedMinutes * 60 * 1000,
+      ),
+    };
+  }
+
+  async resolveSnapshotMinutes(
+    priority: PriorityLevel,
+    snapshotAckMinutes?: number | null,
+    snapshotResolutionMinutes?: number | null,
+  ) {
+    if (snapshotAckMinutes != null && snapshotResolutionMinutes != null) {
+      return {
+        acknowledgementMinutes: snapshotAckMinutes,
+        resolutionMinutes: snapshotResolutionMinutes,
+      };
+    }
+
+    const policy = await this.getPolicy(priority);
+    return {
+      acknowledgementMinutes:
+        snapshotAckMinutes ?? policy.acknowledgementMinutes,
+      resolutionMinutes: snapshotResolutionMinutes ?? policy.resolutionMinutes,
+    };
+  }
+
+  async buildTicketSlaSnapshot(
+    priority: PriorityLevel,
+    startDate: Date = new Date(),
+  ) {
+    const policy = await this.getPolicy(priority);
+    const deadlines = this.calculateDeadlinesFromMinutes(
+      startDate,
+      policy.acknowledgementMinutes,
+      policy.resolutionMinutes,
+    );
+
+    return {
+      acknowledgementMinutes: policy.acknowledgementMinutes,
+      resolutionMinutes: policy.resolutionMinutes,
+      ackDeadline: deadlines.ack,
+      resolutionDeadline: deadlines.resolution,
+    };
+  }
+
   async calculateDeadlines(
     priority: PriorityLevel,
     startDate: Date = new Date(),
   ) {
     const policy = await this.getPolicy(priority);
 
-    return {
-      ack: new Date(
-        startDate.getTime() + policy.acknowledgementMinutes * 60 * 1000,
-      ),
-      resolution: new Date(
-        startDate.getTime() + policy.resolutionMinutes * 60 * 1000,
-      ),
-    };
+    return this.calculateDeadlinesFromMinutes(
+      startDate,
+      policy.acknowledgementMinutes,
+      policy.resolutionMinutes,
+    );
   }
 
   async calculateDeadlinesWithPause(
@@ -107,15 +171,14 @@ export class SlaService {
     startDate: Date,
     totalPausedMinutes: number,
   ) {
-    const deadlines = await this.calculateDeadlines(priority, startDate);
+    const policy = await this.getPolicy(priority);
 
-    // Add paused minutes to deadlines
-    return {
-      ack: new Date(deadlines.ack.getTime() + totalPausedMinutes * 60 * 1000),
-      resolution: new Date(
-        deadlines.resolution.getTime() + totalPausedMinutes * 60 * 1000,
-      ),
-    };
+    return this.calculateDeadlinesFromMinutes(
+      startDate,
+      policy.acknowledgementMinutes,
+      policy.resolutionMinutes,
+      totalPausedMinutes,
+    );
   }
 
   checkBreaches(ticket: {
