@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowRight,
   BarChart3,
+  Clock,
   Layers,
   Monitor,
   Settings,
@@ -58,6 +59,15 @@ const links = [
     bg: "bg-rose-500/10",
   },
   {
+    href: "/admin/sla-policies",
+    label: "SLA Policies",
+    description: "Set response and resolution targets.",
+    icon: Clock,
+    accent: "text-indigo-400",
+    border: "border-indigo-500/20",
+    bg: "bg-indigo-500/10",
+  },
+  {
     href: "/admin/profile",
     label: "Profile",
     description: "Update your account settings.",
@@ -91,10 +101,13 @@ export default function AdminDashboardPage() {
             <Link key={link.href} href={link.href} className="group block">
               <div className="flex h-full flex-col justify-between rounded-xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-white/20 hover:bg-white/[0.06]">
                 <div className="space-y-3">
-                  <div className={cn(
-                    "flex h-9 w-9 items-center justify-center rounded-lg border",
-                    link.bg, link.border,
-                  )}>
+                  <div
+                    className={cn(
+                      "flex h-9 w-9 items-center justify-center rounded-lg border",
+                      link.bg,
+                      link.border,
+                    )}
+                  >
                     <link.icon className={cn("h-4 w-4", link.accent)} />
                   </div>
                   <div>
@@ -118,4 +131,3 @@ export default function AdminDashboardPage() {
     </section>
   );
 }
-

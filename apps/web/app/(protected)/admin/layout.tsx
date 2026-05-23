@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
+  ShieldCheck,
   LayoutDashboard,
   LogOut,
   Building2,
@@ -176,6 +177,26 @@ export default function AdminLayout({
                 )}
               >
                 Known Issues
+              </span>
+            </Link>
+
+            <Link
+              href="/admin/sla-policies"
+              className={cn(
+                "group relative flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition",
+                pathname === "/admin/sla-policies"
+                  ? "bg-white/10 text-white"
+                  : "text-zinc-400 hover:bg-white/5",
+              )}
+            >
+              <ShieldCheck className="h-5 w-5 shrink-0" />
+              <span
+                className={cn(
+                  "transition-all duration-300",
+                  isCollapsed && "w-0 overflow-hidden",
+                )}
+              >
+                SLA Policies
               </span>
             </Link>
 
