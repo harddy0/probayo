@@ -177,6 +177,15 @@ export default function AdminUsersPage() {
     setError(null);
   };
 
+  // Escape key closes edit modal
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeEdit();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [closeEdit]);
+
   const handleSaveEdit = async () => {
     if (!editingUser) return;
     const payload: Record<string, string> = {};
@@ -221,6 +230,15 @@ export default function AdminUsersPage() {
     setShowCreate(false);
     setError(null);
   };
+
+  // Escape key closes create modal
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeCreate();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [closeCreate]);
 
   const handleCreateUser = async () => {
     const { email, passwordHash, firstName, lastName, role, departmentId, isActive } = createForm;

@@ -119,6 +119,15 @@ export default function AdminKnownIssuesPage() {
     setError(null);
   };
 
+  // Escape key closes modal
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeModal();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [closeModal]);
+
   const handleSubmit = async () => {
     if (!formData.title.trim()) {
       setError("Title is required.");

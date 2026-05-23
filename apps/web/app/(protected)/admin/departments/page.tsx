@@ -147,6 +147,15 @@ export default function DepartmentsPage() {
     setError(null);
   };
 
+  // Escape key closes modal
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeModal();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [closeModal]);
+
   return (
     <section className="flex h-full flex-col gap-3">
       {/* ── Ultra-compact header row ── */}

@@ -20,6 +20,7 @@ import {
   updateSlaPolicy,
 } from "@/lib/api/sla-policies";
 import type { SlaPolicy, SlaPolicyPriority } from "@/lib/types/sla-policies";
+import { useToast } from "@/components/ui/toast-provider";
 import { cn } from "@/lib/utils";
 
 const priorityOptions: SlaPolicyPriority[] = [
@@ -84,6 +85,8 @@ export default function AdminSlaPoliciesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const { push: pushToast } = useToast();
 
   const [formData, setFormData] = useState({
     acknowledgementMinutes: "",
@@ -176,6 +179,16 @@ export default function AdminSlaPoliciesPage() {
     setError(null);
   };
 
+  // Escape key closes modal
+  useEffect(() => {
+    if (!modal.priority) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeModal();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [modal.priority, closeModal]);
+
   const handleSubmit = async () => {
     const ackValue = parsePositiveInt(formData.acknowledgementMinutes);
     const resValue = parsePositiveInt(formData.resolutionMinutes);
@@ -211,6 +224,11 @@ export default function AdminSlaPoliciesPage() {
         setPolicies((prev) =>
           prev.map((p) => (p.id === modal.policy!.id ? updated : p)),
         );
+        pushToast({
+          title: "SLA updated",
+          description: `${priorityLabels[modal.priority]} policy has been updated.`,
+          variant: "success",
+        });
       } else {
         const created = await createSlaPolicy({
           priorityLevel: modal.priority,
@@ -218,6 +236,11 @@ export default function AdminSlaPoliciesPage() {
           resolutionMinutes: resValue,
         });
         setPolicies((prev) => [created, ...prev]);
+        pushToast({
+          title: "SLA created",
+          description: `${priorityLabels[modal.priority]} policy has been created.`,
+          variant: "success",
+        });
       }
       closeModal();
     } catch (err) {
@@ -393,16 +416,17 @@ export default function AdminSlaPoliciesPage() {
                 </div>
               )}
 
-              <div className="space-y-1.5">
-                <Label className="text-xs text-zinc-400">Priority</Label>
-                <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-100">
-                  <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
-                    {modal.priority}
-                  </span>
-                  <span className="text-xs text-zinc-400">
-                    {priorityLabels[modal.priority]}
-                  </span>
-                </div>
+              {/* Priority badge — read-only, styled by level */}
+              <div className="flex items-center justify-center py-2">
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-semibold uppercase tracking-wider",
+                    priorityStyles[modal.priority],
+                  )}
+                >
+                  <span className="h-2 w-2 rounded-full bg-current opacity-60" />
+                  {priorityLabels[modal.priority]}
+                </span>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
