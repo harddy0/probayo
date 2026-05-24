@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ChevronLeft,
@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { logout } from "@/lib/api/auth";
 import { getAuthSession } from "@/lib/api/client";
+import { fetchUnreadCount } from "@/lib/api/notifications";
+import NotificationBellDropdown from "@/components/it-staff/notification-bell-dropdown";
 import { cn } from "@/lib/utils";
 
 export default function ClientLayout({
@@ -24,6 +26,8 @@ export default function ClientLayout({
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const mountedRef = useRef(false);
+  const [unreadCount, setUnreadCount] = useState<number | null>(null);
 
   useEffect(() => {
     const session = getAuthSession();
@@ -46,6 +50,9 @@ export default function ClientLayout({
     } else {
       // Employee and other roles can access client area
       setIsAuthorized(true);
+      fetchUnreadCount()
+        .then((count) => { if (mountedRef.current) setUnreadCount(count); })
+        .catch(() => { /* ignore */ });
     }
   }, [router]);
 
@@ -204,6 +211,11 @@ export default function ClientLayout({
           isCollapsed ? "ml-20" : "ml-64",
         )}
       >
+        {/* Floating notification bell — bottom-right */}
+        <div className="fixed bottom-6 right-6 z-40">
+          <NotificationBellDropdown direction="up" basePath="/client" />
+        </div>
+
         <div className="h-full overflow-y-auto">
           <div className="px-6 py-6 sm:px-8">{children}</div>
         </div>

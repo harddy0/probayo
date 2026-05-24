@@ -186,7 +186,7 @@ export default function ItStaffLayout({ children }: Readonly<{ children: React.R
       )}>
         {/* Floating notification bell — bottom-right */}
         <div className="fixed bottom-6 right-6 z-40">
-          <NotificationBellDropdown direction="up" />
+          <NotificationBellDropdown direction="up" basePath="/it-staff" />
         </div>
 
         <div className="h-full overflow-y-auto">

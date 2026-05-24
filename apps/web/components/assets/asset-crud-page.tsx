@@ -399,7 +399,7 @@ export function AssetCrudPage({
                 <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-zinc-500">Asset Information</p>
                 <h2 className="mt-0.5 text-base font-semibold text-white">Asset details</h2>
               </div>
-              <button onClick={closeAssetDetails} className="rounded-full p-1.5 text-zinc-500 transition hover:bg-white/10 hover:text-white">
+              <button onClick={closeAssetDetails} className="rounded-lg p-1.5 text-zinc-500 transition hover:bg-white/10 hover:text-white">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -458,7 +458,7 @@ export function AssetCrudPage({
                   {mode === "edit" ? "Update asset information." : "Add a new asset to inventory."}
                 </p>
               </div>
-              <button onClick={closeModal} className="rounded-full p-1.5 text-zinc-500 transition hover:bg-white/10 hover:text-white">
+              <button onClick={closeModal} className="rounded-lg p-1.5 text-zinc-500 transition hover:bg-white/10 hover:text-white">
                 <X className="h-4 w-4" />
               </button>
             </div>

@@ -75,9 +75,12 @@ const formatTimeAgo = (dateStr: string | null): string => {
 
 export default function NotificationBellDropdown({
   direction = "down",
+  basePath = "/it-staff",
 }: {
   /** "down" — dropdown appears below (sidebar use), "up" — dropdown appears above (floating use) */
   direction?: "down" | "up";
+  /** Base path for routing (e.g. "/it-staff", "/client", "/admin") */
+  basePath?: string;
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -167,9 +170,9 @@ export default function NotificationBellDropdown({
 
     // Navigate
     if (notif.ticket?.id) {
-      router.push(`/it-staff/tickets?ticketId=${notif.ticket.id}`);
+      router.push(`${basePath}/tickets?ticketId=${notif.ticket.id}`);
     } else {
-      router.push("/it-staff/tickets");
+      router.push(`${basePath}/tickets`);
     }
   };
 
@@ -201,7 +204,7 @@ export default function NotificationBellDropdown({
               type="button"
               onClick={() => {
                 setIsOpen(false);
-                router.push("/it-staff/notifications");
+                router.push(`${basePath}/notifications`);
               }}
               className="text-[10px] uppercase tracking-wider text-zinc-500 transition hover:text-zinc-200"
             >
