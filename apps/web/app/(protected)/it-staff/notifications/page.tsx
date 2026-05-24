@@ -210,179 +210,177 @@ export default function ItStaffNotificationsPage() {
     else if (isYesterday) key = "Yesterday";
     else key = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" }).format(notifDate);
 
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(notif);
+    (acc[key] ??= []).push(notif);
     return acc;
   }, {});
 
   const isEmpty = !isLoading && notifications.length === 0;
 
   return (
-    <section className="space-y-8 pb-24">
-      {/* ── Page Header ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-[10px] uppercase tracking-widest text-zinc-500">
-            Notifications
-          </p>
-          <h1 className="mt-1.5 text-3xl font-semibold tracking-tight text-white">
-            Notifications
-          </h1>
-          <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">
-            Updates on tickets, assignments, and SLA status
-          </p>
+    <section className="flex h-full flex-col gap-3">
+      {/* ── Compact header ── */}
+      <div className="flex shrink-0 items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/10">
+            <Bell className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold text-white">Notifications</h1>
+            <p className="text-xs text-zinc-500">Updates on tickets, assignments, and SLA status</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button
-            className="h-10 bg-white/10 text-zinc-200 hover:bg-white/15"
+            className="h-8 bg-white/10 px-3 text-xs text-zinc-200 hover:bg-white/15"
             onClick={() => void handleMarkAllAsRead()}
             disabled={isMarkingAll || notifications.length === 0}
           >
             {isMarkingAll ? (
-              <Loader className="mr-2 h-4 w-4 animate-spin" />
+              <Loader className="mr-1.5 h-3.5 w-3.5 animate-spin" />
             ) : (
-              <CheckSquare className="mr-2 h-4 w-4" />
+              <CheckSquare className="mr-1.5 h-3.5 w-3.5" />
             )}
-            Mark all as read
+            Mark all read
           </Button>
-          <Button
-            className="h-10 bg-white/10 text-zinc-200 hover:bg-white/15"
+          <button
             onClick={loadNotifications}
+            className="rounded-lg border border-white/10 p-1.5 text-zinc-500 transition hover:bg-white/10 hover:text-white"
           >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
+            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+          </button>
         </div>
       </div>
 
       {/* ── Error Banner ── */}
       {error ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4">
-          <AlertCircle className="h-5 w-5 shrink-0 text-rose-400" />
-          <p className="text-sm leading-relaxed text-rose-200">{error}</p>
+        <div className="flex shrink-0 items-center gap-2.5 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-2.5 text-sm text-rose-200">
+          <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+          <span>{error}</span>
         </div>
       ) : null}
 
-      {/* ── Loading ── */}
-      {isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="flex animate-pulse items-center gap-4 rounded-2xl border border-white/10 bg-white/5 px-5 py-4"
-            >
-              <div className="h-8 w-8 shrink-0 rounded-xl bg-white/10" />
-              <div className="flex-1 space-y-1.5">
-                <div className="h-3 w-3/4 rounded bg-white/10" />
-                <div className="h-2.5 w-1/2 rounded bg-white/5" />
+      {/* ── Scrollable content ── */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex animate-pulse items-center gap-4 rounded-xl border border-white/10 bg-white/5 px-5 py-4"
+              >
+                <div className="h-8 w-8 shrink-0 rounded-lg bg-white/10" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 w-3/4 rounded bg-white/10" />
+                  <div className="h-2.5 w-1/2 rounded bg-white/5" />
+                </div>
+                <div className="h-3 w-12 rounded bg-white/5" />
               </div>
-              <div className="h-3 w-12 rounded bg-white/5" />
-            </div>
-          ))}
-        </div>
-      ) : isEmpty ? (
-        /* ── Empty State ── */
-        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-6 py-16">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-            <Bell className="h-6 w-6 text-zinc-500" />
+            ))}
           </div>
-          <p className="text-sm text-zinc-400">No notifications yet.</p>
-          <p className="text-xs text-zinc-500">
-            You will be notified when tickets are assigned or updated.
-          </p>
-        </div>
-      ) : (
-        /* ── Grouped Notification List ── */
-        <div className="space-y-8">
-          {Object.entries(grouped).map(([dateLabel, items]) => (
-            <div key={dateLabel} className="space-y-2">
-              <p className="text-[10px] uppercase tracking-widest text-zinc-500">
-                {dateLabel}
-              </p>
-              <div className="space-y-1">
-                {items.map((notif) => {
-                  const cfg = typeConfig[notif.type] ?? typeConfig.TicketCreated;
-                  const isMarking = markingIds.has(notif.id);
-                  const isUnread = !notif.readAt;
+        ) : isEmpty ? (
+          /* ── Empty State ── */
+          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-6 py-16">
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-white/10 bg-white/5">
+              <Bell className="h-6 w-6 text-zinc-500" />
+            </div>
+            <p className="text-sm text-zinc-400">No notifications yet.</p>
+            <p className="text-xs text-zinc-500">
+              You will be notified when tickets are assigned or updated.
+            </p>
+          </div>
+        ) : (
+          /* ── Grouped Notification List ── */
+          <div className="space-y-6">
+            {Object.entries(grouped).map(([dateLabel, items]) => (
+              <div key={dateLabel} className="space-y-2">
+                <p className="text-[10px] uppercase tracking-widest text-zinc-500">
+                  {dateLabel}
+                </p>
+                <div className="space-y-1">
+                  {items.map((notif) => {
+                    const cfg = typeConfig[notif.type] ?? typeConfig.TicketCreated;
+                    const isMarking = markingIds.has(notif.id);
+                    const isUnread = !notif.readAt;
 
-                  return (
-                    <button
-                      key={notif.id}
-                      type="button"
-                      onClick={() => void handleNotificationClick(notif)}
-                      disabled={isMarking}
-                      className={cn(
-                        "group relative flex w-full items-start gap-4 rounded-2xl border px-5 py-4 text-left transition-all duration-150",
-                        isUnread
-                          ? "border-white/[0.10] bg-white/5"
-                          : "border-white/5 bg-transparent",
-                        isMarking ? "opacity-60" : "hover:border-white/20 hover:bg-white/[0.07]",
-                      )}
-                    >
-                      {/* Unread dot */}
-                      {isUnread ? (
-                        <span className="absolute left-2 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-emerald-400" />
-                      ) : null}
-
-                      {/* Type icon badge */}
-                      <div
+                    return (
+                      <button
+                        key={notif.id}
+                        type="button"
+                        onClick={() => void handleNotificationClick(notif)}
+                        disabled={isMarking}
                         className={cn(
-                          "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border",
-                          cfg.color,
+                          "group relative flex w-full items-start gap-4 rounded-xl border px-5 py-4 text-left transition-all duration-150",
+                          isUnread
+                            ? "border-white/[0.10] bg-white/5"
+                            : "border-white/5 bg-transparent",
+                          isMarking ? "opacity-60" : "hover:border-white/20 hover:bg-white/[0.07]",
                         )}
                       >
-                        {cfg.icon}
-                      </div>
+                        {/* Unread dot */}
+                        {isUnread ? (
+                          <span className="absolute left-2 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-emerald-400" />
+                        ) : null}
 
-                      {/* Content */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={cn(
-                              "inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider",
-                              cfg.color,
-                            )}
-                          >
-                            {cfg.label}
-                          </span>
-                          {notif.ticket ? (
-                            <span className="truncate text-xs font-medium text-zinc-100">
-                              {notif.ticket.title}
+                        {/* Type icon badge */}
+                        <div
+                          className={cn(
+                            "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
+                            cfg.color,
+                          )}
+                        >
+                          {cfg.icon}
+                        </div>
+
+                        {/* Content */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={cn(
+                                "inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider",
+                                cfg.color,
+                              )}
+                            >
+                              {cfg.label}
                             </span>
-                          ) : null}
-                        </div>
-                        <p className="mt-1 text-sm leading-relaxed text-zinc-400 line-clamp-2">
-                          {notif.body}
-                        </p>
+                            {notif.ticket ? (
+                              <span className="truncate text-xs font-medium text-zinc-100">
+                                {notif.ticket.title}
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-1 text-sm leading-relaxed text-zinc-400 line-clamp-2">
+                            {notif.body}
+                          </p>
 
-                        {/* Footer */}
-                        <div className="mt-2 flex items-center gap-3 text-xs text-zinc-500">
-                          <span>{formatTimeAgo(notif.sentAt ?? notif.createdAt)}</span>
-                          {notif.subject ? (
-                            <>
-                              <span className="text-zinc-700">·</span>
-                              <span className="truncate">{notif.subject}</span>
-                            </>
-                          ) : null}
+                          {/* Footer */}
+                          <div className="mt-2 flex items-center gap-3 text-xs text-zinc-500">
+                            <span>{formatTimeAgo(notif.sentAt ?? notif.createdAt)}</span>
+                            {notif.subject ? (
+                              <>
+                                <span className="text-zinc-700">·</span>
+                                <span className="truncate">{notif.subject}</span>
+                              </>
+                            ) : null}
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Chevron + spinner */}
-                      <div className="mt-1 shrink-0">
-                        {isMarking ? (
-                          <Loader className="h-4 w-4 animate-spin text-zinc-400" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 text-zinc-600 transition group-hover:text-zinc-400" />
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
+                        {/* Chevron + spinner */}
+                        <div className="mt-1 shrink-0">
+                          {isMarking ? (
+                            <Loader className="h-4 w-4 animate-spin text-zinc-400" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-zinc-600 transition group-hover:text-zinc-400" />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   );
 }

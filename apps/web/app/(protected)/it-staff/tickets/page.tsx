@@ -16,6 +16,7 @@ import {
   LogOut,
   RefreshCw,
   Search,
+  TicketCheck,
   Trash2,
   UserCheck,
   X,
@@ -646,26 +647,24 @@ export default function ItStaffTicketsPage() {
   const ticketListEmpty = !isLoading && filteredTickets.length === 0;
 
   return (
-    <section className="space-y-8 pb-24">
-      {/* ── Page Header ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-[10px] uppercase tracking-widest text-zinc-500">
-            Ticket Queue
-          </p>
-          <h1 className="mt-1.5 text-3xl font-semibold tracking-tight text-white">
-            Tickets
-          </h1>
-          <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">
-            Manage incoming support requests
-          </p>
+    <section className="flex h-full flex-col gap-3">
+      {/* ── Compact header ── */}
+      <div className="flex shrink-0 items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/10">
+            <TicketCheck className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold text-white">Tickets</h1>
+            <p className="text-xs text-zinc-500">Manage incoming support requests</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button
-            className="h-10 bg-white/10 text-zinc-200 hover:bg-white/15"
+            className="h-8 bg-white/10 px-3 text-xs text-zinc-200 hover:bg-white/15"
             onClick={handleRefresh}
           >
-            <RefreshCw className="mr-2 h-4 w-4" />
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
             Refresh
           </Button>
         </div>
@@ -673,14 +672,14 @@ export default function ItStaffTicketsPage() {
 
       {/* ── Error Banner ── */}
       {error ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4">
-          <AlertCircle className="h-5 w-5 shrink-0 text-rose-400" />
-          <p className="text-sm leading-relaxed text-rose-200">{error}</p>
+        <div className="flex shrink-0 items-center gap-2.5 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-2.5 text-sm text-rose-200">
+          <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+          <span>{error}</span>
         </div>
       ) : null}
 
       {/* ── View Switcher ── */}
-      <div className="flex items-center gap-1 rounded-2xl border border-white/10 bg-white/5 p-1">
+      <div className="flex shrink-0 items-center gap-1 rounded-2xl border border-white/10 bg-white/5 p-1">
         {views.map((view) => (
           <button
             key={view.id}
@@ -700,7 +699,7 @@ export default function ItStaffTicketsPage() {
       </div>
 
       {/* ── Search + Filter Bar ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
           <input
@@ -737,7 +736,7 @@ export default function ItStaffTicketsPage() {
       </div>
 
       {/* ── Ticket Table ── */}
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+      <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-white/5">
         {isLoading ? (
           <div className="divide-y divide-white/[0.06]">
             {Array.from({ length: 5 }).map((_, i) => (

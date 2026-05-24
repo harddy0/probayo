@@ -33,7 +33,6 @@ export {
   createKnownIssue,
   updateKnownIssue,
   deleteKnownIssue,
-  resolveKnownIssue,
   bulkAttachKnownIssue,
   createAndAttachKnownIssue,
 } from "./known-issues";

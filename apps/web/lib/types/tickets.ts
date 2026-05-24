@@ -7,17 +7,27 @@
 import type { Asset } from "./assets";
 
 // ── Re-exports from feature-based modules ──
-export type {
+import type {
   TicketCategory,
   TicketCategoryCreateRequest,
   TicketCategoryUpdateRequest,
 } from "./ticket-categories";
-
 export type {
+  TicketCategory,
+  TicketCategoryCreateRequest,
+  TicketCategoryUpdateRequest,
+};
+
+import type {
   KnownIssueStatus,
   KnownIssue,
   BulkAttachKnownIssueRequest,
 } from "./known-issues";
+export type {
+  KnownIssueStatus,
+  KnownIssue,
+  BulkAttachKnownIssueRequest,
+};
 
 export type TicketPriority = "Critical" | "High" | "Medium" | "Low";
 

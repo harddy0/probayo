@@ -73,7 +73,12 @@ const formatTimeAgo = (dateStr: string | null): string => {
 
 // ── Dropdown Component ──
 
-export default function NotificationBellDropdown() {
+export default function NotificationBellDropdown({
+  direction = "down",
+}: {
+  /** "down" — dropdown appears below (sidebar use), "up" — dropdown appears above (floating use) */
+  direction?: "down" | "up";
+}) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
@@ -185,7 +190,10 @@ export default function NotificationBellDropdown() {
 
       {/* Dropdown */}
       {isOpen ? (
-        <div className="absolute right-0 top-full z-[300] mt-2 w-80 overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl backdrop-blur-xl">
+        <div className={cn(
+          "absolute right-0 z-[300] w-80 overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl backdrop-blur-xl",
+          direction === "down" ? "top-full mt-2" : "bottom-full mb-2",
+        )}>
           {/* Header */}
           <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
             <span className="text-xs font-semibold text-zinc-100">Notifications</span>
