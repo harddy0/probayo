@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Activity,
@@ -21,6 +21,17 @@ import { fetchItStaffDashboardStats } from "@/lib/api/it-staff";
 import type { ItStaffDashboardStats } from "@/lib/types/it-staff";
 import type { TicketPriority, TicketStatus } from "@/lib/types/tickets";
 import { cn } from "@/lib/utils";
+
+const accentStyles = {
+  emerald: { border: "border-emerald-500/20", icon: "text-emerald-400", value: "text-emerald-200" },
+  amber: { border: "border-amber-500/20", icon: "text-amber-400", value: "text-amber-200" },
+  rose: { border: "border-rose-500/20", icon: "text-rose-400", value: "text-rose-200" },
+  sky: { border: "border-sky-500/20", icon: "text-sky-400", value: "text-sky-200" },
+  indigo: { border: "border-indigo-500/20", icon: "text-indigo-400", value: "text-indigo-200" },
+  zinc: { border: "border-white/10", icon: "text-zinc-400", value: "text-white" },
+} as const;
+
+type Accent = keyof typeof accentStyles;
 
 // ── Helpers ──
 
@@ -46,13 +57,6 @@ const statusLabels: Record<TicketStatus, string> = {
   Closed: "Closed",
 };
 
-const priorityColors: Record<TicketPriority, string> = {
-  Critical: "border-rose-500/30 bg-rose-500/10 text-rose-200",
-  High: "border-orange-500/30 bg-orange-500/10 text-orange-200",
-  Medium: "border-amber-500/30 bg-amber-500/10 text-amber-200",
-  Low: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
-};
-
 // ── Stat Card ──
 
 function StatCard({
@@ -65,54 +69,20 @@ function StatCard({
   label: string;
   value: number | string;
   icon: React.ReactNode;
-  accent: "emerald" | "amber" | "rose" | "sky" | "indigo" | "zinc";
+  accent: Accent;
   subtext?: string;
 }) {
-  const accentBorders: Record<string, string> = {
-    emerald: "border-emerald-500/20",
-    amber: "border-amber-500/20",
-    rose: "border-rose-500/20",
-    sky: "border-sky-500/20",
-    indigo: "border-indigo-500/20",
-    zinc: "border-white/10",
-  };
-  const accentIcons: Record<string, string> = {
-    emerald: "text-emerald-400",
-    amber: "text-amber-400",
-    rose: "text-rose-400",
-    sky: "text-sky-400",
-    indigo: "text-indigo-400",
-    zinc: "text-zinc-400",
-  };
-  const accentValues: Record<string, string> = {
-    emerald: "text-emerald-200",
-    amber: "text-amber-200",
-    rose: "text-rose-200",
-    sky: "text-sky-200",
-    indigo: "text-indigo-200",
-    zinc: "text-white",
-  };
+  const a = accentStyles[accent];
 
   return (
-    <div className={cn(
-      "rounded-xl border bg-white/[0.03] p-4 transition hover:bg-white/[0.06]",
-      accentBorders[accent],
-    )}>
+    <div className={cn("rounded-xl border bg-white/[0.03] p-4 transition hover:bg-white/[0.06]", a.border)}>
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <p className="text-[10px] uppercase tracking-widest text-zinc-500">{label}</p>
-          <p className={cn("text-2xl font-semibold tracking-tight", accentValues[accent])}>
-            {value}
-          </p>
-          {subtext ? (
-            <p className="text-[10px] text-zinc-500 leading-tight">{subtext}</p>
-          ) : null}
+          <p className={cn("text-2xl font-semibold tracking-tight", a.value)}>{value}</p>
+          {subtext ? <p className="text-[10px] text-zinc-500 leading-tight">{subtext}</p> : null}
         </div>
-        <div className={cn(
-          "flex h-8 w-8 items-center justify-center rounded-lg border bg-white/5",
-          accentIcons[accent],
-          accentBorders[accent],
-        )}>
+        <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg border bg-white/5", a.icon, a.border)}>
           {icon}
         </div>
       </div>
@@ -162,9 +132,7 @@ export default function ItStaffDashboard() {
     setError(null);
     try {
       const data = await fetchItStaffDashboardStats(currentUserId);
-      if (mountedRef.current) {
-        setStats(data);
-      }
+      if (mountedRef.current) setStats(data);
     } catch (err) {
       if (mountedRef.current) {
         setError(isApiError(err) ? err.message : "Failed to load dashboard.");
@@ -273,9 +241,7 @@ export default function ItStaffDashboard() {
             {currentUserName.charAt(0).toUpperCase() || "I"}
           </div>
           <div>
-            <p className="text-sm font-medium text-white">
-              Welcome back, {currentUserName || "IT Staff"}
-            </p>
+            <p className="text-sm font-medium text-white">Welcome back, {currentUserName || "IT Staff"}</p>
             <p className="text-xs text-zinc-500">
               {stats
                 ? `You have ${stats.myActive} active ticket${stats.myActive !== 1 ? "s" : ""} assigned`
@@ -345,7 +311,7 @@ export default function ItStaffDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] uppercase tracking-widest text-zinc-500">Tickets by Status</p>
-                <p className="text-[10px] text-zinc-500">{totalTickets} total</p>
+                <p className="text-xs text-zinc-500">{totalTickets} total</p>
               </div>
               <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5">
                 <TrendingUp className="h-3.5 w-3.5 text-zinc-400" />
@@ -373,7 +339,7 @@ export default function ItStaffDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] uppercase tracking-widest text-zinc-500">Tickets by Priority</p>
-                <p className="text-[10px] text-zinc-500">{totalTickets} total</p>
+                <p className="text-xs text-zinc-500">{totalTickets} total</p>
               </div>
               <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5">
                 <AlertTriangle className="h-3.5 w-3.5 text-zinc-400" />
@@ -386,7 +352,12 @@ export default function ItStaffDashboard() {
                     <div className="flex items-center justify-between text-xs">
                       <span className={cn(
                         "inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wider",
-                        priorityColors[item.key as TicketPriority] || "border-white/10 bg-white/5 text-zinc-400",
+                        ({
+                          Critical: "border-rose-500/30 bg-rose-500/10 text-rose-200",
+                          High: "border-orange-500/30 bg-orange-500/10 text-orange-200",
+                          Medium: "border-amber-500/30 bg-amber-500/10 text-amber-200",
+                          Low: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
+                        } as Record<string, string>)[item.key] || "border-white/10 bg-white/5 text-zinc-400",
                       )}>
                         {item.label}
                       </span>

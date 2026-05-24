@@ -12,7 +12,6 @@ import {
   Loader,
   MessageSquare,
   RefreshCw,
-  UserCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isApiError } from "@/lib/api/client";
@@ -47,7 +46,7 @@ const typeConfig: Record<
     color: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
   },
   Assignment: {
-    icon: <UserCheck className="h-4 w-4" />,
+    icon: <Bell className="h-4 w-4" />,
     label: "Assigned",
     color: "border-indigo-500/30 bg-indigo-500/10 text-indigo-200",
   },
@@ -83,7 +82,7 @@ const formatTimeAgo = (dateStr: string | null): string => {
 
 // ── Main Page Component ──
 
-export default function ItStaffNotificationsPage() {
+export default function ClientNotificationsPage() {
   const router = useRouter();
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -162,9 +161,9 @@ export default function ItStaffNotificationsPage() {
 
     // Navigate to the related ticket if one exists
     if (notif.ticket?.id) {
-      router.push(`/it-staff/tickets?ticketId=${notif.ticket.id}`);
+      router.push(`/client/tickets?ticketId=${notif.ticket.id}`);
     } else {
-      router.push("/it-staff/tickets");
+      router.push("/client/tickets");
     }
   };
 
@@ -226,7 +225,7 @@ export default function ItStaffNotificationsPage() {
           </div>
           <div>
             <h1 className="text-lg font-semibold text-white">Notifications</h1>
-            <p className="text-xs text-zinc-500">Updates on tickets, assignments, and SLA status</p>
+            <p className="text-xs text-zinc-500">Updates on your tickets and support requests</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -285,7 +284,7 @@ export default function ItStaffNotificationsPage() {
             </div>
             <p className="text-sm text-zinc-400">No notifications yet.</p>
             <p className="text-xs text-zinc-500">
-              You will be notified when tickets are assigned or updated.
+              You will be notified when your tickets are updated.
             </p>
           </div>
         ) : (

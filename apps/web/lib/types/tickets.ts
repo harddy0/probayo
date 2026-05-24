@@ -7,17 +7,27 @@
 import type { Asset } from "./assets";
 
 // ── Re-exports from feature-based modules ──
-export type {
+import type {
   TicketCategory,
   TicketCategoryCreateRequest,
   TicketCategoryUpdateRequest,
 } from "./ticket-categories";
-
 export type {
+  TicketCategory,
+  TicketCategoryCreateRequest,
+  TicketCategoryUpdateRequest,
+};
+
+import type {
   KnownIssueStatus,
   KnownIssue,
   BulkAttachKnownIssueRequest,
 } from "./known-issues";
+export type {
+  KnownIssueStatus,
+  KnownIssue,
+  BulkAttachKnownIssueRequest,
+};
 
 export type TicketPriority = "Critical" | "High" | "Medium" | "Low";
 
@@ -123,6 +133,8 @@ export type TicketListFilters = {
   categoryId?: string;
   /** Filter for tickets that have no assignee (unclaimed) */
   unassigned?: boolean;
+  /** Filter tickets attached to a specific known issue */
+  knownIssueId?: string;
 };
 
 export type TicketListResponse = Ticket[];

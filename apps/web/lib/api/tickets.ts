@@ -33,7 +33,6 @@ export {
   createKnownIssue,
   updateKnownIssue,
   deleteKnownIssue,
-  resolveKnownIssue,
   bulkAttachKnownIssue,
   createAndAttachKnownIssue,
 } from "./known-issues";
@@ -68,6 +67,9 @@ const buildTicketQuery = (filters?: TicketListFilters) => {
   }
   if (filters.unassigned) {
     params.set("assignedToUserId", "");
+  }
+  if (filters.knownIssueId) {
+    params.set("knownIssueId", filters.knownIssueId);
   }
 
   const query = params.toString();
@@ -133,6 +135,34 @@ export const updateTicket = async (
     method: "PATCH",
     body: data,
   });
+};
+
+/**
+ * Fetch all tickets attached to a specific known issue.
+ */
+export const fetchTicketsByKnownIssue = async (
+  knownIssueId: string,
+): Promise<TicketListResponse> => {
+  return fetchTickets({ knownIssueId });
+};
+
+/**
+ * Resolve all tickets attached to a known issue by setting their status to "Resolved".
+ */
+export const resolveTicketsUnderKnownIssue = async (
+  knownIssueId: string,
+): Promise<Ticket[]> => {
+  const tickets = await fetchTicketsByKnownIssue(knownIssueId);
+  const updated: Ticket[] = [];
+  for (const ticket of tickets) {
+    if (ticket.status !== "Resolved" && ticket.status !== "Closed") {
+      const result = await updateTicket(ticket.id, { status: "Resolved" });
+      updated.push(result);
+    } else {
+      updated.push(ticket);
+    }
+  }
+  return updated;
 };
 
 export const deleteTicket = async (id: string): Promise<void> => {

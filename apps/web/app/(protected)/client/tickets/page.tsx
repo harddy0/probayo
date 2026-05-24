@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import {
   AlertCircle,
@@ -287,6 +288,9 @@ export default function ClientTicketsPage() {
 
   // Track active detail request to prevent stale responses
   const activeDetailRequestRef = useRef<string | null>(null);
+  const handledUrlRef = useRef(false);
+
+  const searchParams = useSearchParams();
 
   const ticketFileInputRef = useRef<HTMLInputElement | null>(null);
   const commentFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -389,6 +393,18 @@ export default function ClientTicketsPage() {
     void loadReferenceData();
   }, [loadReferenceData]);
 
+  useEffect(() => {
+    if (handledUrlRef.current) return;
+    const ticketIdFromUrl = searchParams.get("ticketId");
+    if (ticketIdFromUrl) {
+      handledUrlRef.current = true;
+      const timer = window.setTimeout(() => {
+        handleRowClick(ticketIdFromUrl);
+      }, 300);
+      return () => window.clearTimeout(timer);
+    }
+  }, [searchParams]);
+
   const ticketAttachments = useMemo(() => {
     if (!selectedTicket?.attachments) return [];
     return selectedTicket.attachments.filter(
@@ -422,6 +438,7 @@ export default function ClientTicketsPage() {
     setSelectedTicket(null);
     setSelectedTicketId(null);
     setActiveTab("details");
+    handledUrlRef.current = false;
   };
 
   const updateUploadItem = (id: string, update: Partial<UploadItem>) => {
@@ -818,7 +835,7 @@ export default function ClientTicketsPage() {
               }}
             >
               <div className="mx-4 my-6 w-full max-w-3xl sm:mx-auto">
-                <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-3xl border border-white/10 bg-zinc-900/95 shadow-2xl backdrop-blur-xl">
+                <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-lg border border-white/10 bg-zinc-900/95 shadow-2xl backdrop-blur-xl">
                   {/* Modal Header */}
                   <div className="flex items-start justify-between border-b border-white/[0.06] px-6 py-5">
                     <div className="min-w-0 flex-1">
@@ -866,7 +883,7 @@ export default function ClientTicketsPage() {
                     <button
                       type="button"
                       onClick={handleCloseModal}
-                      className="ml-4 shrink-0 rounded-full p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                      className="ml-4 shrink-0 rounded-lg p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
                     >
                       <X className="h-5 w-5" />
                     </button>
@@ -905,7 +922,7 @@ export default function ClientTicketsPage() {
                         <Loader className="h-6 w-6 animate-spin text-zinc-400" />
                       </div>
                     ) : detailError ? (
-                      <div className="flex items-center gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4">
+                      <div className="flex items-center gap-3 rounded-lg border border-rose-500/20 bg-rose-500/10 p-4">
                         <AlertCircle className="h-5 w-5 shrink-0 text-rose-400" />
                         <p className="text-sm text-rose-200">{detailError}</p>
                       </div>
@@ -919,7 +936,7 @@ export default function ClientTicketsPage() {
                         {activeTab === "details" ? (
                           <div className="space-y-6">
                             {/* Description */}
-                            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                            <div className="rounded-lg border border-white/10 bg-white/5 p-5">
                               <p className="mb-2 text-[10px] uppercase tracking-widest text-zinc-500">
                                 Description
                               </p>
@@ -1019,7 +1036,7 @@ export default function ClientTicketsPage() {
                                     event.target.files,
                                   )
                                 }
-                                className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-xl file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
+                                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
                               />
                               <p className="text-xs text-zinc-500">
                                 Max 10MB per file. Images, PDF, docs,
@@ -1036,7 +1053,7 @@ export default function ClientTicketsPage() {
                                 {uploadQueue.map((item) => (
                                   <div
                                     key={item.id}
-                                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300"
+                                    className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300"
                                   >
                                     <span className="truncate">
                                       {item.fileName}
@@ -1060,7 +1077,7 @@ export default function ClientTicketsPage() {
 
                             {/* Attachment List */}
                             {ticketAttachments.length === 0 ? (
-                              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-zinc-500">
+                              <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-center text-sm text-zinc-500">
                                 No attachments yet.
                               </div>
                             ) : (
@@ -1072,7 +1089,7 @@ export default function ClientTicketsPage() {
                                 {ticketAttachments.map((attachment) => (
                                   <div
                                     key={attachment.id}
-                                    className="overflow-hidden rounded-2xl border border-white/10 bg-white/5"
+                                    className="overflow-hidden rounded-lg border border-white/10 bg-white/5"
                                   >
                                     {/* Image preview */}
                                     {attachment.fileType?.startsWith(
@@ -1146,7 +1163,7 @@ export default function ClientTicketsPage() {
                                 {selectedTicket.comments.map((comment) => (
                                   <div
                                     key={comment.id}
-                                    className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                                    className="rounded-lg border border-white/10 bg-white/5 p-4"
                                   >
                                     <div className="flex items-center justify-between text-xs text-zinc-500">
                                       <span className="font-medium text-zinc-300">
@@ -1231,13 +1248,13 @@ export default function ClientTicketsPage() {
                                 ))}
                               </div>
                             ) : (
-                              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-zinc-500">
+                              <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-center text-sm text-zinc-500">
                                 No comments yet.
                               </div>
                             )}
 
                             {/* Add Comment Form */}
-                            <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+                            <div className="space-y-3 rounded-lg border border-white/10 bg-white/5 p-4">
                               <Label>Add a comment</Label>
                               <Textarea
                                 value={commentBody}
@@ -1255,7 +1272,7 @@ export default function ClientTicketsPage() {
                                 onChange={(event) =>
                                   setCommentFiles(event.target.files)
                                 }
-                                className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-xl file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
+                                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
                               />
                               {commentError ? (
                                 <p className="text-sm text-rose-400">
@@ -1304,7 +1321,7 @@ export default function ClientTicketsPage() {
 
 function MetadataItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+    <div className="rounded-lg border border-white/10 bg-white/5 p-4">
       <p className="text-[10px] uppercase tracking-widest text-zinc-500">
         {label}
       </p>

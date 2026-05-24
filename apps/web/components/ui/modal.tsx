@@ -37,7 +37,7 @@ export function Modal({
       }}
     >
       <div className="mx-4 my-6 w-full max-w-lg sm:mx-auto">
-        <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-3xl border border-white/10 bg-zinc-900/95 shadow-2xl shadow-black/50 backdrop-blur-xl">
+        <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-lg border border-white/10 bg-zinc-900/95 shadow-2xl shadow-black/50 backdrop-blur-xl">
           <div className="flex items-start justify-between border-b border-white/[0.06] px-6 py-4">
             <div className="min-w-0 flex-1 pr-4">
               {title && (
@@ -53,7 +53,7 @@ export function Modal({
             </div>
             <button
               onClick={onClose}
-              className="shrink-0 rounded-full p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+              className="shrink-0 rounded-lg p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
             >
               <X className="h-5 w-5" />
             </button>
@@ -64,14 +64,14 @@ export function Modal({
           <div className="flex items-center justify-end gap-3 border-t border-white/[0.06] px-6 py-4">
             <button
               onClick={onClose}
-              className="h-10 rounded-2xl border border-white/10 px-4 text-sm text-zinc-200 transition hover:border-white/20 hover:bg-white/10"
+              className="h-10 rounded-lg border border-white/10 px-4 text-sm text-zinc-200 transition hover:border-white/20 hover:bg-white/10"
             >
               {cancelLabel}
             </button>
             <button
               onClick={onConfirm}
               disabled={loading}
-              className="h-10 rounded-2xl bg-white px-5 text-sm font-semibold text-zinc-950 shadow-lg shadow-black/20 transition hover:bg-zinc-100 disabled:opacity-60"
+              className="h-10 rounded-lg bg-white px-5 text-sm font-semibold text-zinc-950 shadow-lg shadow-black/20 transition hover:bg-zinc-100 disabled:opacity-60"
             >
               {loading ? "Working…" : confirmLabel}
             </button>

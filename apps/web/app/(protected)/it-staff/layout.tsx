@@ -110,6 +110,17 @@ export default function ItStaffLayout({ children }: Readonly<{ children: React.R
               <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>Tickets</span>
             </Link>
 
+            <Link
+              href="/it-staff/assets"
+              className={cn(
+                "group relative flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition",
+                pathname === "/it-staff/assets" ? "bg-white/10 text-white" : "text-zinc-400 hover:bg-white/5",
+              )}
+            >
+              <HardDrive className="h-5 w-5 shrink-0" />
+              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>Assets</span>
+            </Link>
+
             <div className="relative">
               <Link
                 href="/it-staff/notifications"
@@ -141,39 +152,30 @@ export default function ItStaffLayout({ children }: Readonly<{ children: React.R
               <User className="h-5 w-5 shrink-0" />
               <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>Profile</span>
             </Link>
-
-            <Link
-              href="/it-staff/assets"
-              className={cn(
-                "group relative flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition",
-                pathname === "/it-staff/assets" ? "bg-white/10 text-white" : "text-zinc-400 hover:bg-white/5",
-              )}
-            >
-              <HardDrive className="h-5 w-5 shrink-0" />
-              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>Assets</span>
-            </Link>
           </nav>
 
           <div className="space-y-2 border-t border-white/10 pt-4">
-            <button
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold text-zinc-400 transition hover:bg-white/5"
-            >
-              {isCollapsed ? (
-                <ChevronRight className="h-5 w-5 shrink-0" />
-              ) : (
-                <ChevronLeft className="h-5 w-5 shrink-0" />
-              )}
-              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>Collapse</span>
-            </button>
+            <div className="border-t border-white/5 pt-2 space-y-2">
+              <button
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold text-zinc-400 transition hover:bg-white/5"
+              >
+                {isCollapsed ? (
+                  <ChevronRight className="h-5 w-5 shrink-0" />
+                ) : (
+                  <ChevronLeft className="h-5 w-5 shrink-0" />
+                )}
+                <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>Collapse</span>
+              </button>
 
-            <button
-              onClick={handleLogout}
-              className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold text-zinc-400 transition hover:bg-white/5"
-            >
-              <LogOut className="h-5 w-5 shrink-0" />
-              <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>Logout</span>
-            </button>
+              <button
+                onClick={handleLogout}
+                className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold text-zinc-400 transition hover:bg-white/5"
+              >
+                <LogOut className="h-5 w-5 shrink-0" />
+                <span className={cn("transition-all duration-300", isCollapsed && "w-0 overflow-hidden")}>Logout</span>
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -182,11 +184,12 @@ export default function ItStaffLayout({ children }: Readonly<{ children: React.R
         "relative z-10 h-screen overflow-hidden transition-[margin-left] duration-300",
         isCollapsed ? "ml-20" : "ml-64",
       )}>
-        {/* Top header bar */}
-        <div className="flex h-14 items-center justify-end border-b border-white/10 bg-white/[0.02] px-6">
-          <NotificationBellDropdown />
+        {/* Floating notification bell — bottom-right */}
+        <div className="fixed bottom-6 right-6 z-40">
+          <NotificationBellDropdown direction="up" basePath="/it-staff" />
         </div>
-        <div className="h-[calc(100vh-3.5rem)] overflow-y-auto">
+
+        <div className="h-full overflow-y-auto">
           <div className="px-6 py-6 sm:px-8">
             {children}
           </div>

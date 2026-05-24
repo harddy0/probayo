@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import {
   AlertCircle,
+  Bug,
   CheckCircle2,
   ChevronDown,
   Circle,
@@ -16,6 +17,7 @@ import {
   LogOut,
   RefreshCw,
   Search,
+  TicketCheck,
   Trash2,
   UserCheck,
   X,
@@ -38,10 +40,17 @@ import {
   downloadAttachment,
   fetchAttachmentJobStatus,
   fetchTicketById,
+  fetchTicketsByKnownIssue,
+  resolveTicketsUnderKnownIssue,
   updateTicket,
   uploadCommentAttachment,
   uploadTicketAttachment,
 } from "@/lib/api/tickets";
+import {
+  bulkAttachKnownIssue,
+  fetchActiveKnownIssues,
+  fetchKnownIssues,
+} from "@/lib/api/known-issues";
 import {
   claimAndAcknowledge,
   fetchItStaffTickets,
@@ -53,7 +62,10 @@ import type {
   TicketPriority,
   TicketStatus,
 } from "@/lib/types/tickets";
+import type { KnownIssue } from "@/lib/types/known-issues";
 import type { ItStaffTicketView } from "@/lib/types/it-staff";
+import StatusPipeline from "@/components/it-staff/status-pipeline";
+import BatchAttachModal from "@/components/it-staff/batch-attach-modal";
 import { cn } from "@/lib/utils";
 
 // ── Constants ──
@@ -103,6 +115,17 @@ const priorityStyles: Record<TicketPriority, string> = {
   Medium: "border-amber-500/30 bg-amber-500/10 text-amber-200",
   Low: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
 };
+
+const STATUS_ORDER = ["Open", "Acknowledged", "PendingUser", "InProgress", "Resolved", "Closed"] as const;
+
+const PROG_COLORS = [
+  "bg-emerald-500/50",
+  "bg-sky-500/50",
+  "bg-amber-500/50",
+  "bg-indigo-500/50",
+  "bg-emerald-500/50",
+  "bg-zinc-500/30",
+] as const;
 
 const statusFlows: Record<TicketStatus, TicketStatus[]> = {
   Open: ["Acknowledged", "InProgress", "Resolved", "Closed"],
@@ -323,6 +346,57 @@ export default function ItStaffTicketsPage() {
   const [actionState, setActionState] = useState<ActionState | null>(null);
   const [statusMenuOpen, setStatusMenuOpen] = useState<string | null>(null);
 
+  // ── Batch Selection State ──
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBatchAttachOpen, setIsBatchAttachOpen] = useState(false);
+  const [isResolvingAll, setIsResolvingAll] = useState(false);
+  const [singleAttachTicketId, setSingleAttachTicketId] = useState<string | null>(null);
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    if (selectedIds.size === filteredTickets.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredTickets.map((t) => t.id)));
+    }
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBatchAttach = async (knownIssueId: string) => {
+    const ids = singleAttachTicketId ? [singleAttachTicketId] : Array.from(selectedIds);
+    await bulkAttachKnownIssue({ ticketIds: ids, knownIssueId });
+    push({ title: "Attached", description: `${ids.length} ticket${ids.length !== 1 ? "s" : ""} linked to known issue.`, variant: "success" });
+    setSingleAttachTicketId(null);
+    clearSelection();
+    if (selectedTicket) await loadTicketDetail(selectedTicket.id);
+    await loadTickets();
+  };
+
+  const handleResolveAllUnderKnownIssue = async (knownIssueId: string) => {
+    setIsResolvingAll(true);
+    try {
+      const resolved = await resolveTicketsUnderKnownIssue(knownIssueId);
+      push({ title: "Resolved", description: `${resolved.length} ticket${resolved.length !== 1 ? "s" : ""} resolved.`, variant: "success" });
+      if (selectedTicket) {
+        await loadTicketDetail(selectedTicket.id);
+      }
+      await loadTickets();
+    } catch (err) {
+      push({ title: "Failed", description: isApiError(err) ? err.message : "Could not resolve tickets.", variant: "error" });
+    } finally {
+      setIsResolvingAll(false);
+    }
+  };
+
   // ── Comment State ──
   const [commentBody, setCommentBody] = useState("");
   const [commentFiles, setCommentFiles] = useState<FileList | null>(null);
@@ -470,6 +544,7 @@ export default function ItStaffTicketsPage() {
     setSelectedTicket(null);
     setSelectedTicketId(null);
     setActiveTab("details");
+    handledUrlRef.current = false;
   };
 
   const handleViewChange = (view: ItStaffTicketView) => {
@@ -646,26 +721,24 @@ export default function ItStaffTicketsPage() {
   const ticketListEmpty = !isLoading && filteredTickets.length === 0;
 
   return (
-    <section className="space-y-8 pb-24">
-      {/* ── Page Header ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-[10px] uppercase tracking-widest text-zinc-500">
-            Ticket Queue
-          </p>
-          <h1 className="mt-1.5 text-3xl font-semibold tracking-tight text-white">
-            Tickets
-          </h1>
-          <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">
-            Manage incoming support requests
-          </p>
+    <section className="flex h-full flex-col gap-3">
+      {/* ── Compact header ── */}
+      <div className="flex shrink-0 items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/10">
+            <TicketCheck className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold text-white">Tickets</h1>
+            <p className="text-xs text-zinc-500">Manage incoming support requests</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button
-            className="h-10 bg-white/10 text-zinc-200 hover:bg-white/15"
+            className="h-8 bg-white/10 px-3 text-xs text-zinc-200 hover:bg-white/15"
             onClick={handleRefresh}
           >
-            <RefreshCw className="mr-2 h-4 w-4" />
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
             Refresh
           </Button>
         </div>
@@ -673,14 +746,14 @@ export default function ItStaffTicketsPage() {
 
       {/* ── Error Banner ── */}
       {error ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4">
-          <AlertCircle className="h-5 w-5 shrink-0 text-rose-400" />
-          <p className="text-sm leading-relaxed text-rose-200">{error}</p>
+        <div className="flex shrink-0 items-center gap-2.5 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-2.5 text-sm text-rose-200">
+          <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+          <span>{error}</span>
         </div>
       ) : null}
 
       {/* ── View Switcher ── */}
-      <div className="flex items-center gap-1 rounded-2xl border border-white/10 bg-white/5 p-1">
+      <div className="flex shrink-0 items-center gap-1 rounded-2xl border border-white/10 bg-white/5 p-1">
         {views.map((view) => (
           <button
             key={view.id}
@@ -700,7 +773,7 @@ export default function ItStaffTicketsPage() {
       </div>
 
       {/* ── Search + Filter Bar ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
           <input
@@ -736,8 +809,33 @@ export default function ItStaffTicketsPage() {
         </Select>
       </div>
 
+      {/* ── Batch Operations Toolbar ── */}
+      {selectedIds.size > 0 ? (
+        <div className="flex shrink-0 items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5">
+          <span className="text-sm text-zinc-400">
+            <span className="font-medium text-zinc-200">{selectedIds.size}</span> selected
+          </span>
+          <div className="h-4 w-px bg-white/10" />
+          <button
+            type="button"
+            onClick={() => setIsBatchAttachOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/20 px-3 py-1.5 text-xs font-medium text-amber-200 transition hover:bg-amber-500/30"
+          >
+            <Bug className="h-3.5 w-3.5" />
+            Attach to known issue
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="ml-auto text-xs text-zinc-500 transition hover:text-zinc-300"
+          >
+            Clear
+          </button>
+        </div>
+      ) : null}
+
       {/* ── Ticket Table ── */}
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+      <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-white/5">
         {isLoading ? (
           <div className="divide-y divide-white/[0.06]">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -778,14 +876,22 @@ export default function ItStaffTicketsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-white/[0.06]">
-                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">#</th>
-                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">Title</th>
-                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">Priority</th>
-                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">Status</th>
-                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">SLA</th>
-                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">Assignee</th>
-                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">Created</th>
-                  <th className="px-6 py-3.5 text-right text-[10px] font-medium uppercase tracking-widest text-zinc-500">Actions</th>
+                  <th className="w-10 px-3 py-3.5 text-left">
+                    <input
+                      type="checkbox"
+                      checked={filteredTickets.length > 0 && selectedIds.size === filteredTickets.length}
+                      onChange={selectAll}
+                      className="rounded border-white/20 bg-white/5"
+                    />
+                  </th>
+                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">#</th>
+                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">Ticket</th>
+                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">Issue</th>
+                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">Priority</th>
+                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">Progression</th>
+                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">SLA</th>
+                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">Assignee</th>
+                  <th className="px-3 py-3.5 text-right text-[10px] font-medium uppercase tracking-widest text-zinc-500">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.06]">
@@ -795,52 +901,94 @@ export default function ItStaffTicketsPage() {
                   const isUnassigned = !ticket.assignedToUserId;
                   const availableStatuses = statusFlows[ticket.status] ?? [];
 
+
+                  const currentIdx = STATUS_ORDER.indexOf(ticket.status as typeof STATUS_ORDER[number]);
+
                   return (
                     <tr
                       key={ticket.id}
                       onClick={() => handleRowClick(ticket.id)}
-                      className="cursor-pointer transition-colors duration-150 hover:bg-white/5"
+                      className={cn(
+                        "cursor-pointer transition-colors duration-150",
+                        selectedIds.has(ticket.id) ? "bg-white/[0.04]" : "hover:bg-white/5",
+                      )}
                     >
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-zinc-500">
+                      {/* Checkbox */}
+                      <td className="w-10 px-3 py-4" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(ticket.id)}
+                          onChange={() => toggleSelection(ticket.id)}
+                          className="rounded border-white/20 bg-white/5"
+                        />
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-500">
                         {String(index + 1).padStart(2, "0")}
                       </td>
-                      <td className="max-w-[240px] px-6 py-4">
+                      <td className="max-w-[200px] px-3 py-4">
                         <div className="flex flex-col">
-                          <p className="truncate text-sm font-medium text-zinc-100">{ticket.title}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="truncate text-sm font-medium text-zinc-100">{ticket.title}</p>
+                          </div>
                           <p className="truncate text-xs text-zinc-500">
                             {ticket.filedByUser ? formatUserName(ticket.filedByUser) : "—"}
                           </p>
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4">
+                      {/* Known Issue */}
+                      <td className="whitespace-nowrap px-3 py-4">
+                        {ticket.knownIssueId ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-amber-200">
+                            <Bug className="h-2.5 w-2.5" />
+                            Known
+                          </span>
+                        ) : (
+                          <span className="text-xs text-zinc-600">—</span>
+                        )}
+                      </td>
+                      {/* Priority */}
+                      <td className="whitespace-nowrap px-3 py-4">
                         <span className={cn(
-                          "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
+                          "inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider",
                           priorityStyles[ticket.priority],
                         )}>
                           {priorityLabels[ticket.priority]}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4">
-                        <span className={cn(
-                          "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
-                          statusStyles[ticket.status],
-                        )}>
-                          {statusLabels[ticket.status]}
-                        </span>
+                      {/* Mini Progression */}
+                      <td className="whitespace-nowrap px-3 py-4">
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-0.5">
+                            {STATUS_ORDER.map((_, i) => (
+                              <div
+                                key={i}
+                                className={cn(
+                                  "h-1.5 w-1.5 rounded-full transition-all",
+                                  i < currentIdx && PROG_COLORS[i],
+                                  i === currentIdx && "h-1.5 w-3 rounded-full bg-white",
+                                  i > currentIdx && "bg-white/10",
+                                )}
+                              />
+                            ))}
+                          </div>
+                          <span className={cn(
+                            "ml-1 inline-flex items-center rounded-full border px-1.5 py-0.5 text-[8px] font-medium uppercase tracking-wider",
+                            statusStyles[ticket.status],
+                          )}>
+                            {statusLabels[ticket.status]}
+                          </span>
+                        </div>
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4">
+                      <td className="whitespace-nowrap px-3 py-4">
                         <SlaTimer
                           deadline={ticket.slaResolutionDeadline}
                           breached={ticket.slaResolutionBreached}
                         />
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-zinc-400">
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-400">
                         {formatUserName(ticket.assignedToUser)}
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-zinc-400">
-                        {formatDateTime(ticket.createdAt)}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-right">
+                      <td className="whitespace-nowrap px-3 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                           {/* Accept / Claim */}
                           {isUnassigned ? (
@@ -878,7 +1026,7 @@ export default function ItStaffTicketsPage() {
                                 Status
                               </button>
                               {statusMenuOpen === ticket.id ? (
-                                <div className="absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl backdrop-blur-xl">
+                                <div className="absolute right-0 bottom-full z-50 mb-1 w-44 overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl backdrop-blur-xl">
                                   {availableStatuses.map((s) => (
                                     <button
                                       key={s}
@@ -934,7 +1082,7 @@ export default function ItStaffTicketsPage() {
               onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }}
             >
               <div className="mx-4 my-6 w-full max-w-3xl sm:mx-auto">
-                <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-3xl border border-white/10 bg-zinc-900/95 shadow-2xl backdrop-blur-xl">
+                <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-lg border border-white/10 bg-zinc-900/95 shadow-2xl backdrop-blur-xl">
                   {/* Modal Header */}
                   <div className="flex items-start justify-between border-b border-white/[0.06] px-6 py-5">
                     <div className="min-w-0 flex-1">
@@ -1022,7 +1170,7 @@ export default function ItStaffTicketsPage() {
                     <button
                       type="button"
                       onClick={handleCloseModal}
-                      className="ml-4 shrink-0 rounded-full p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                      className="ml-4 shrink-0 rounded-lg p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
                     >
                       <X className="h-5 w-5" />
                     </button>
@@ -1061,7 +1209,7 @@ export default function ItStaffTicketsPage() {
                         <Loader className="h-6 w-6 animate-spin text-zinc-400" />
                       </div>
                     ) : detailError ? (
-                      <div className="flex items-center gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4">
+                      <div className="flex items-center gap-3 rounded-lg border border-rose-500/20 bg-rose-500/10 p-4">
                         <AlertCircle className="h-5 w-5 shrink-0 text-rose-400" />
                         <p className="text-sm text-rose-200">{detailError}</p>
                       </div>
@@ -1073,11 +1221,82 @@ export default function ItStaffTicketsPage() {
                         {activeTab === "details" ? (
                           <div className="space-y-6">
                             {/* Description */}
-                            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                            <div className="rounded-lg border border-white/10 bg-white/5 p-5">
                               <p className="mb-2 text-[10px] uppercase tracking-widest text-zinc-500">Description</p>
                               <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-200">
                                 {selectedTicket.description}
                               </p>
+                            </div>
+
+                            {/* ── Status Pipeline ── */}
+                            <StatusPipeline
+                              currentStatus={selectedTicket.status}
+                              isStaff={selectedTicket.assignedToUserId === currentUserId}
+                              onStatusClick={
+                                selectedTicket.assignedToUserId === currentUserId
+                                  ? (s) => void handleStatusChange(selectedTicket.id, s)
+                                  : undefined
+                              }
+                            />
+
+                            {/* ── Known Issue Section ── */}
+                            <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.03] p-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Bug className="h-4 w-4 text-amber-400" />
+                                  <p className="text-[10px] uppercase tracking-widest text-amber-400/80">
+                                    Known Issue
+                                  </p>
+                                </div>
+                                {selectedTicket.knownIssueId ? (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      try {
+                                        await updateTicket(selectedTicket.id, { knownIssueId: null });
+                                        push({ title: "Detached", description: "Known issue removed from ticket.", variant: "success" });
+                                        await loadTicketDetail(selectedTicket.id);
+                                      } catch (err) {
+                                        push({ title: "Failed", description: isApiError(err) ? err.message : "Could not detach.", variant: "error" });
+                                      }
+                                    }}
+                                    className="text-xs text-zinc-500 transition hover:text-rose-300"
+                                  >
+                                    Detach
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSingleAttachTicketId(selectedTicket.id);
+                                      setIsBatchAttachOpen(true);
+                                    }}
+                                    className="text-xs text-amber-400 transition hover:text-amber-300"
+                                  >
+                                    Attach
+                                  </button>
+                                )}
+                              </div>
+                              {selectedTicket.knownIssueId ? (
+                                <div className="mt-3 space-y-2">
+                                  <p className="text-sm text-zinc-400">
+                                    This ticket is linked to a known issue.
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleResolveAllUnderKnownIssue(selectedTicket.knownIssueId!)}
+                                    disabled={isResolvingAll}
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-200 transition hover:bg-emerald-500/30 disabled:opacity-50"
+                                  >
+                                    {isResolvingAll ? (
+                                      <Loader className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                    )}
+                                    Resolve all tickets under this issue
+                                  </button>
+                                </div>
+                              ) : null}
                             </div>
 
                             {/* Metadata Grid */}
@@ -1092,14 +1311,8 @@ export default function ItStaffTicketsPage() {
                               <MetadataItem label="Acknowledged" value={formatDateTime(selectedTicket.acknowledgedAt)} />
                               <MetadataItem label="SLA Acknowledge" value={formatDateTime(selectedTicket.slaAckDeadline)} />
                               <MetadataItem label="SLA Resolution" value={formatDateTime(selectedTicket.slaResolutionDeadline)} />
-                              <MetadataItem
-                                label="SLA Ack Breached"
-                                value={selectedTicket.slaAckBreached ? "Yes" : "No"}
-                              />
-                              <MetadataItem
-                                label="SLA Resolution Breached"
-                                value={selectedTicket.slaResolutionBreached ? "Yes" : "No"}
-                              />
+                              <MetadataItem label="SLA Ack Breached" value={selectedTicket.slaAckBreached ? "Yes" : "No"} />
+                              <MetadataItem label="SLA Resolution Breached" value={selectedTicket.slaResolutionBreached ? "Yes" : "No"} />
                             </div>
 
                             {/* Status History */}
@@ -1145,7 +1358,7 @@ export default function ItStaffTicketsPage() {
                                 multiple
                                 accept={ACCEPTED_FILE_TYPES}
                                 onChange={(event) => void handleTicketFilesChange(event.target.files)}
-                                className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-xl file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
+                                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
                               />
                               <p className="text-xs text-zinc-500">
                                 Max 10MB per file. Images, PDF, docs, spreadsheets, text, and archives supported.
@@ -1155,10 +1368,8 @@ export default function ItStaffTicketsPage() {
                             {uploadQueue.length > 0 ? (
                               <div className="space-y-2">
                                 <p className="text-[10px] uppercase tracking-widest text-zinc-500">Uploads</p>
-                                {uploadQueue.map((item) => (
-                                  <div
-                                    key={item.id}
-                                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300"
+                                {uploadQueue.map((item) => (                                  <div key={item.id}
+                                    className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300"
                                   >
                                     <span className="truncate">{item.fileName}</span>
                                     <span className={cn(
@@ -1177,7 +1388,7 @@ export default function ItStaffTicketsPage() {
                             ) : null}
 
                             {ticketAttachments.length === 0 ? (
-                              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-zinc-500">
+                              <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-center text-sm text-zinc-500">
                                 No attachments yet.
                               </div>
                             ) : (
@@ -1186,7 +1397,7 @@ export default function ItStaffTicketsPage() {
                                   {ticketAttachments.length} attachment{ticketAttachments.length !== 1 ? "s" : ""}
                                 </p>
                                 {ticketAttachments.map((attachment) => (
-                                  <div key={attachment.id} className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+                                  <div key={attachment.id} className="overflow-hidden rounded-lg border border-white/10 bg-white/5">
                                     {attachment.fileType?.startsWith("image/") ? (
                                       <div className="border-b border-white/10 bg-white/[0.02] p-3">
                                         <AttachmentImage attachment={attachment} />
@@ -1234,7 +1445,7 @@ export default function ItStaffTicketsPage() {
                                   {selectedTicket.comments.length} comment{selectedTicket.comments.length !== 1 ? "s" : ""}
                                 </p>
                                 {selectedTicket.comments.map((comment) => (
-                                  <div key={comment.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                  <div key={comment.id} className="rounded-lg border border-white/10 bg-white/5 p-4">
                                     <div className="flex items-center justify-between text-xs text-zinc-500">
                                       <span className="font-medium text-zinc-300">
                                         {formatUserName(comment.authorUser)}
@@ -1287,13 +1498,13 @@ export default function ItStaffTicketsPage() {
                                 ))}
                               </div>
                             ) : (
-                              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-zinc-500">
+                              <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-center text-sm text-zinc-500">
                                 No comments yet.
                               </div>
                             )}
 
                             {/* Add Comment Form */}
-                            <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+                            <div className="space-y-3 rounded-lg border border-white/10 bg-white/5 p-4">
                               <Label>Add a comment</Label>
                               <Textarea
                                 value={commentBody}
@@ -1307,7 +1518,7 @@ export default function ItStaffTicketsPage() {
                                 multiple
                                 accept={ACCEPTED_FILE_TYPES}
                                 onChange={(event) => setCommentFiles(event.target.files)}
-                                className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-xl file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
+                                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
                               />
                               {commentError ? (
                                 <p className="text-sm text-rose-400">{commentError}</p>
@@ -1338,13 +1549,24 @@ export default function ItStaffTicketsPage() {
             document.body,
           )
         : null}
+
+      {/* ── Batch Attach Modal ── */}
+      <BatchAttachModal
+        open={isBatchAttachOpen}
+        onClose={() => {
+          setIsBatchAttachOpen(false);
+          setSingleAttachTicketId(null);
+        }}
+        onAttach={handleBatchAttach}
+        selectedCount={singleAttachTicketId ? 1 : selectedIds.size}
+      />
     </section>
   );
 }
 
 function MetadataItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+    <div className="rounded-lg border border-white/10 bg-white/5 p-4">
       <p className="text-[10px] uppercase tracking-widest text-zinc-500">{label}</p>
       <p className="mt-1.5 text-sm text-zinc-100">{value}</p>
     </div>
