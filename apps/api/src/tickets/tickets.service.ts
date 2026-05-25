@@ -327,9 +327,7 @@ export class TicketsService {
           user.role === UserRole.ItStaff &&
           updateTicketDto.assignedToUserId !== user.id
         ) {
-          throw new ForbiddenException(
-            'IT staff can only self-assign tickets',
-          );
+          throw new ForbiddenException('IT staff can only self-assign tickets');
         }
 
         assignedToUserForNotification = await this.prisma.user.findUnique({
@@ -359,9 +357,7 @@ export class TicketsService {
           user.role === UserRole.ItStaff &&
           existingTicket.assignedToUserId !== user.id
         ) {
-          throw new ForbiddenException(
-            'IT staff can only unassign themselves',
-          );
+          throw new ForbiddenException('IT staff can only unassign themselves');
         }
       }
     }
@@ -677,9 +673,7 @@ export class TicketsService {
     }
 
     if (assignedToUser.role !== UserRole.ItStaff) {
-      throw new BadRequestException(
-        'Tickets can only be assigned to IT staff',
-      );
+      throw new BadRequestException('Tickets can only be assigned to IT staff');
     }
 
     const updatedTicket = await this.prisma.ticket.update({
@@ -742,7 +736,10 @@ export class TicketsService {
       );
     }
 
-    if (actor.role === UserRole.ItStaff && ticket.assignedToUserId !== actor.id) {
+    if (
+      actor.role === UserRole.ItStaff &&
+      ticket.assignedToUserId !== actor.id
+    ) {
       throw new ForbiddenException('IT staff can only unassign themselves');
     }
 
