@@ -156,7 +156,7 @@ export class NotificationsService {
     return notification;
   }
 
-  async markAsRead(id: string, userId: string) {
+  async markAsSeen(id: string, userId: string) {
     const notification = await this.prisma.notification.findUnique({
       where: { id },
     });
@@ -167,14 +167,14 @@ export class NotificationsService {
 
     if (notification.recipientUserId !== userId) {
       throw new ForbiddenException(
-        'You can only mark your own notifications as read',
+        'You can only mark your own notifications as seen',
       );
     }
 
     return this.prisma.notification.update({
       where: { id },
       data: {
-        sentAt: new Date(),
+        isSeen: true,
       },
       include: {
         recipientUser: {
@@ -199,7 +199,7 @@ export class NotificationsService {
     return this.prisma.notification.count({
       where: {
         recipientUserId: userId,
-        sentAt: null,
+        isSeen: false,
       },
     });
   }
