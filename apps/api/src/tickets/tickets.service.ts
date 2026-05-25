@@ -154,7 +154,13 @@ export class TicketsService {
 
     // Apply filters
     if (filters?.status) {
-      where.status = filters.status;
+      const normalizedStatus = this.normalizeTicketStatus(
+        filters.status as string,
+      );
+      if (!normalizedStatus) {
+        throw new BadRequestException('Invalid status filter');
+      }
+      where.status = normalizedStatus;
     }
     if (filters?.priority) {
       where.priority = filters.priority;
@@ -293,10 +299,86 @@ export class TicketsService {
     // 3. Prepare update data
     const updateData: any = { ...updateTicketDto };
 
+    const isAssigning = updateTicketDto.assignedToUserId !== undefined;
+    let assignedToUserForNotification: {
+      id: string;
+      email: string;
+      firstName: string | null;
+      lastName: string | null;
+      role: UserRole;
+    } | null = null;
+
+    if (isAssigning) {
+      if (user.role !== UserRole.Admin && user.role !== UserRole.ItStaff) {
+        throw new ForbiddenException(
+          'Only admins and IT staff can assign tickets',
+        );
+      }
+
+      if (updateTicketDto.assignedToUserId) {
+        if (
+          user.role === UserRole.Admin &&
+          updateTicketDto.assignedToUserId === user.id
+        ) {
+          throw new ForbiddenException('Admins cannot self-assign tickets');
+        }
+
+        if (
+          user.role === UserRole.ItStaff &&
+          updateTicketDto.assignedToUserId !== user.id
+        ) {
+          throw new ForbiddenException(
+            'IT staff can only self-assign tickets',
+          );
+        }
+
+        assignedToUserForNotification = await this.prisma.user.findUnique({
+          where: { id: updateTicketDto.assignedToUserId },
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        });
+
+        if (!assignedToUserForNotification) {
+          throw new NotFoundException(
+            `User ${updateTicketDto.assignedToUserId} not found`,
+          );
+        }
+
+        if (assignedToUserForNotification.role !== UserRole.ItStaff) {
+          throw new BadRequestException(
+            'Tickets can only be assigned to IT staff',
+          );
+        }
+      } else if (updateTicketDto.assignedToUserId === null) {
+        if (
+          user.role === UserRole.ItStaff &&
+          existingTicket.assignedToUserId !== user.id
+        ) {
+          throw new ForbiddenException(
+            'IT staff can only unassign themselves',
+          );
+        }
+      }
+    }
+
     // 4. Handle status change
     let statusChanged = false;
     const oldStatus = existingTicket.status;
-    const newStatus = updateTicketDto.status;
+    const newStatus = this.normalizeTicketStatus(updateTicketDto.status);
+
+    if (updateTicketDto.status && !newStatus) {
+      throw new BadRequestException('Invalid status value');
+    }
+
+    if (newStatus) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      updateData.status = newStatus;
+    }
 
     if (newStatus && newStatus !== oldStatus) {
       statusChanged = true;
@@ -481,6 +563,36 @@ export class TicketsService {
       );
     }
 
+    if (
+      isAssigning &&
+      assignedToUserForNotification &&
+      assignedToUserForNotification.id !== existingTicket.assignedToUserId
+    ) {
+      const assigneeName =
+        [
+          assignedToUserForNotification.firstName,
+          assignedToUserForNotification.lastName,
+        ]
+          .filter(Boolean)
+          .join(' ') || assignedToUserForNotification.email;
+
+      const notificationsService = this.notificationsService as {
+        notifyTicketAssigned: (
+          ticketId: string,
+          ticketTitle: string,
+          assigneeId: string,
+          assigneeName: string,
+        ) => Promise<void>;
+      };
+
+      void notificationsService.notifyTicketAssigned(
+        id,
+        existingTicket.title,
+        assignedToUserForNotification.id,
+        assigneeName,
+      );
+    }
+
     // 10. Check for SLA breaches after update
     await this.slaService.updateBreachStatus(id);
 
@@ -521,13 +633,39 @@ export class TicketsService {
   }
 
   // ==================== ASSIGN TICKET ====================
-  async assignTicket(id: string, assignedToUserId: string) {
+  async assignTicket(
+    id: string,
+    assignedToUserId: string,
+    actorUserId: string,
+  ) {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id },
     });
 
     if (!ticket) {
       throw new NotFoundException(`Ticket ${id} not found`);
+    }
+
+    const actor = await this.prisma.user.findUnique({
+      where: { id: actorUserId },
+    });
+
+    if (!actor) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (actor.role !== UserRole.Admin && actor.role !== UserRole.ItStaff) {
+      throw new ForbiddenException(
+        'Only admins and IT staff can assign tickets',
+      );
+    }
+
+    if (actor.role === UserRole.Admin && actor.id === assignedToUserId) {
+      throw new ForbiddenException('Admins cannot self-assign tickets');
+    }
+
+    if (actor.role === UserRole.ItStaff && actor.id !== assignedToUserId) {
+      throw new ForbiddenException('IT staff can only self-assign tickets');
     }
 
     const assignedToUser = await this.prisma.user.findUnique({
@@ -538,12 +676,9 @@ export class TicketsService {
       throw new NotFoundException(`User ${assignedToUserId} not found`);
     }
 
-    if (
-      assignedToUser.role !== UserRole.ItStaff &&
-      assignedToUser.role !== UserRole.Admin
-    ) {
+    if (assignedToUser.role !== UserRole.ItStaff) {
       throw new BadRequestException(
-        'Tickets can only be assigned to IT staff or admins',
+        'Tickets can only be assigned to IT staff',
       );
     }
 
@@ -584,13 +719,31 @@ export class TicketsService {
   }
 
   // ==================== UNASSIGN TICKET ====================
-  async unassignTicket(id: string) {
+  async unassignTicket(id: string, actorUserId: string) {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id },
     });
 
     if (!ticket) {
       throw new NotFoundException(`Ticket ${id} not found`);
+    }
+
+    const actor = await this.prisma.user.findUnique({
+      where: { id: actorUserId },
+    });
+
+    if (!actor) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (actor.role !== UserRole.Admin && actor.role !== UserRole.ItStaff) {
+      throw new ForbiddenException(
+        'Only admins and IT staff can unassign tickets',
+      );
+    }
+
+    if (actor.role === UserRole.ItStaff && ticket.assignedToUserId !== actor.id) {
+      throw new ForbiddenException('IT staff can only unassign themselves');
     }
 
     return this.prisma.ticket.update({
@@ -706,6 +859,30 @@ export class TicketsService {
     ) {
       throw new ForbiddenException('Only admins can reopen resolved tickets');
     }
+  }
+
+  private normalizeTicketStatus(
+    status?: TicketStatus | string | null,
+  ): TicketStatus | undefined {
+    if (!status) {
+      return undefined;
+    }
+
+    if (Object.values(TicketStatus).includes(status as TicketStatus)) {
+      return status as TicketStatus;
+    }
+
+    const normalized = status.toString().trim().toLowerCase();
+    const mapped: Record<string, TicketStatus> = {
+      open: TicketStatus.Open,
+      acknowledged: TicketStatus.Acknowledged,
+      pending_user: TicketStatus.PendingUser,
+      in_progress: TicketStatus.InProgress,
+      resolved: TicketStatus.Resolved,
+      closed: TicketStatus.Closed,
+    };
+
+    return mapped[normalized];
   }
 
   private canViewTicket(
