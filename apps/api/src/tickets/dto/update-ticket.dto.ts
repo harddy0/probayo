@@ -15,9 +15,10 @@ export class UpdateTicketDto extends PartialType(CreateTicketDto) {
   assignedToUserId?: string | null;
 
   @ApiPropertyOptional({
-    description: 'Current status of the ticket',
+    description:
+      'Current status of the ticket (accepts enum values or snake_case)',
     enum: TicketStatus,
-    example: 'in_progress',
+    example: 'pending_user',
   })
   @IsEnum(TicketStatus)
   @IsOptional()

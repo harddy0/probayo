@@ -151,7 +151,11 @@ export class TicketsController {
   @Post(':id/assign/:userId')
   @Roles(UserRole.Admin, UserRole.ItStaff)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Assign ticket to IT staff (Admin/IT only)' })
+  @ApiOperation({
+    summary: 'Assign ticket to IT staff (Admin assigns, IT can self-assign)',
+    description:
+      'Admins can assign any IT staff but cannot self-assign. IT staff can only assign themselves.',
+  })
   @ApiParam({ name: 'id', description: 'Ticket UUID' })
   @ApiParam({ name: 'userId', description: 'User UUID to assign' })
   @ApiResponse({ status: 200, description: 'Ticket assigned successfully' })
@@ -161,18 +165,22 @@ export class TicketsController {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     @Request() req: { user: { id: string } },
   ) {
-    return this.ticketsService.assignTicket(id, userId);
+    return this.ticketsService.assignTicket(id, userId, req.user.id);
   }
 
   @Post(':id/unassign')
   @Roles(UserRole.Admin, UserRole.ItStaff)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Unassign ticket (Admin/IT only)' })
+  @ApiOperation({
+    summary: 'Unassign ticket (Admin/IT only)',
+    description:
+      'Admins can unassign any ticket. IT staff can only unassign themselves.',
+  })
   @ApiParam({ name: 'id', description: 'Ticket UUID' })
   @ApiResponse({ status: 200, description: 'Ticket unassigned successfully' })
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   unassign(@Param('id') id: string, @Request() req: { user: { id: string } }) {
-    return this.ticketsService.unassignTicket(id);
+    return this.ticketsService.unassignTicket(id, req.user.id);
   }
 
   // ==================== COMMENT ENDPOINTS ====================

@@ -15,7 +15,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isApiError } from "@/lib/api/client";
-import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from "@/lib/api/notifications";
+import {
+  fetchNotifications,
+  markNotificationSeen,
+  markNotificationsSeen,
+} from "@/lib/api/notifications";
 import type { Notification, NotificationType } from "@/lib/types/notifications";
 import { cn } from "@/lib/utils";
 
@@ -142,12 +146,12 @@ export default function ClientNotificationsPage() {
   // ── Mark as read and navigate ──
 
   const handleNotificationClick = async (notif: Notification) => {
-    // Mark as read optimistically
+    // Mark as seen optimistically
     setMarkingIds((prev) => new Set(prev).add(notif.id));
     try {
-      await markNotificationRead(notif.id);
+      await markNotificationSeen(notif.id);
       setNotifications((prev) =>
-        prev.map((n) => (n.id === notif.id ? { ...n, readAt: new Date().toISOString() } : n)),
+        prev.map((n) => (n.id === notif.id ? { ...n, isSeen: true } : n)),
       );
     } catch {
       // If marking fails, we still navigate — not critical
@@ -172,10 +176,9 @@ export default function ClientNotificationsPage() {
   const handleMarkAllAsRead = async () => {
     setIsMarkingAll(true);
     try {
-      await markAllNotificationsRead();
-      setNotifications((prev) =>
-        prev.map((n) => ({ ...n, readAt: new Date().toISOString() })),
-      );
+      const unreadIds = notifications.filter((n) => !n.isSeen).map((n) => n.id);
+      await markNotificationsSeen(unreadIds);
+      setNotifications((prev) => prev.map((n) => ({ ...n, isSeen: true })));
     } catch (err) {
       setError(isApiError(err) ? err.message : "Failed to mark all as read.");
     } finally {
@@ -185,33 +188,38 @@ export default function ClientNotificationsPage() {
 
   // ── Group by date ──
 
-  const grouped = notifications.reduce<
-    Record<string, Notification[]>
-  >((acc, notif) => {
-    const date = notif.sentAt ?? notif.createdAt;
-    const today = new Date();
-    const notifDate = new Date(date);
-    let key: string;
+  const grouped = notifications.reduce<Record<string, Notification[]>>(
+    (acc, notif) => {
+      const date = notif.sentAt ?? notif.createdAt;
+      const today = new Date();
+      const notifDate = new Date(date);
+      let key: string;
 
-    const isToday =
-      notifDate.getFullYear() === today.getFullYear() &&
-      notifDate.getMonth() === today.getMonth() &&
-      notifDate.getDate() === today.getDate();
+      const isToday =
+        notifDate.getFullYear() === today.getFullYear() &&
+        notifDate.getMonth() === today.getMonth() &&
+        notifDate.getDate() === today.getDate();
 
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const isYesterday =
-      notifDate.getFullYear() === yesterday.getFullYear() &&
-      notifDate.getMonth() === yesterday.getMonth() &&
-      notifDate.getDate() === yesterday.getDate();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const isYesterday =
+        notifDate.getFullYear() === yesterday.getFullYear() &&
+        notifDate.getMonth() === yesterday.getMonth() &&
+        notifDate.getDate() === yesterday.getDate();
 
-    if (isToday) key = "Today";
-    else if (isYesterday) key = "Yesterday";
-    else key = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" }).format(notifDate);
+      if (isToday) key = "Today";
+      else if (isYesterday) key = "Yesterday";
+      else
+        key = new Intl.DateTimeFormat("en-US", {
+          month: "long",
+          day: "numeric",
+        }).format(notifDate);
 
-    (acc[key] ??= []).push(notif);
-    return acc;
-  }, {});
+      (acc[key] ??= []).push(notif);
+      return acc;
+    },
+    {},
+  );
 
   const isEmpty = !isLoading && notifications.length === 0;
 
@@ -225,7 +233,9 @@ export default function ClientNotificationsPage() {
           </div>
           <div>
             <h1 className="text-lg font-semibold text-white">Notifications</h1>
-            <p className="text-xs text-zinc-500">Updates on your tickets and support requests</p>
+            <p className="text-xs text-zinc-500">
+              Updates on your tickets and support requests
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -297,9 +307,10 @@ export default function ClientNotificationsPage() {
                 </p>
                 <div className="space-y-1">
                   {items.map((notif) => {
-                    const cfg = typeConfig[notif.type] ?? typeConfig.TicketCreated;
+                    const cfg =
+                      typeConfig[notif.type] ?? typeConfig.TicketCreated;
                     const isMarking = markingIds.has(notif.id);
-                    const isUnread = !notif.readAt;
+                    const isUnread = !notif.isSeen;
 
                     return (
                       <button
@@ -312,7 +323,9 @@ export default function ClientNotificationsPage() {
                           isUnread
                             ? "border-white/[0.10] bg-white/5"
                             : "border-white/5 bg-transparent",
-                          isMarking ? "opacity-60" : "hover:border-white/20 hover:bg-white/[0.07]",
+                          isMarking
+                            ? "opacity-60"
+                            : "hover:border-white/20 hover:bg-white/[0.07]",
                         )}
                       >
                         {/* Unread dot */}
@@ -353,11 +366,15 @@ export default function ClientNotificationsPage() {
 
                           {/* Footer */}
                           <div className="mt-2 flex items-center gap-3 text-xs text-zinc-500">
-                            <span>{formatTimeAgo(notif.sentAt ?? notif.createdAt)}</span>
+                            <span>
+                              {formatTimeAgo(notif.sentAt ?? notif.createdAt)}
+                            </span>
                             {notif.subject ? (
                               <>
                                 <span className="text-zinc-700">·</span>
-                                <span className="truncate">{notif.subject}</span>
+                                <span className="truncate">
+                                  {notif.subject}
+                                </span>
                               </>
                             ) : null}
                           </div>

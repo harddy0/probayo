@@ -15,7 +15,7 @@ describe('NotificationsController', () => {
           useValue: {
             findAll: jest.fn(),
             findOne: jest.fn(),
-            markAsRead: jest.fn(),
+            markAsSeen: jest.fn(),
             getUnreadCount: jest.fn(),
           },
         },

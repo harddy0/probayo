@@ -13,8 +13,9 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Probayo",
-  description: "Simple system landing and login shell.",
+  title: "Probayo — IT Support Platform",
+  description:
+    "A full-stack IT ticketing and asset management platform with role-based dashboards, SLA tracking, and escalation rules.",
 };
 
 export default function RootLayout({

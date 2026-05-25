@@ -3,7 +3,7 @@ import {
   Controller,
   Get,
   Param,
-  Patch,
+  Put,
   UseGuards,
   Request,
 } from '@nestjs/common';
@@ -65,15 +65,15 @@ export class NotificationsController {
     return this.notificationsService.findOne(id, req.user.id);
   }
 
-  @Patch(':id/read')
-  @ApiOperation({ summary: 'Mark a notification as read' })
+  @Put(':id/seen')
+  @ApiOperation({ summary: 'Mark a notification as seen' })
   @ApiParam({
     name: 'id',
     description: 'Notification UUID',
   })
   @ApiResponse({
     status: 200,
-    description: 'Notification marked as read',
+    description: 'Notification marked as seen',
     type: NotificationResponseDto,
   })
   @ApiResponse({
@@ -84,10 +84,10 @@ export class NotificationsController {
     status: 404,
     description: 'Notification not found',
   })
-  markAsRead(
+  markAsSeen(
     @Param('id') id: string,
     @Request() req: { user: { id: string } },
   ) {
-    return this.notificationsService.markAsRead(id, req.user.id);
+    return this.notificationsService.markAsSeen(id, req.user.id);
   }
 }

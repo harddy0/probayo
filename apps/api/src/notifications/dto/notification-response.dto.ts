@@ -81,6 +81,12 @@ export class NotificationResponseDto {
   })
   body: string | undefined;
 
+  @ApiProperty({
+    description: 'Whether the notification has been seen',
+    example: false,
+  })
+  isSeen: boolean | undefined;
+
   @ApiPropertyOptional({
     description: 'When notification was sent/read',
     nullable: true,

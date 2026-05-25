@@ -287,6 +287,7 @@ model Notification {
   channel         NotificationChannel
   subject         String?            @db.VarChar(255)
   body            String             @db.Text
+  isSeen          Boolean            @default(false) @map("is_seen")
   sentAt          DateTime?          @map("sent_at") @db.DateTime(0)
   createdAt       DateTime           @default(now()) @map("created_at") @db.DateTime(0)
 
