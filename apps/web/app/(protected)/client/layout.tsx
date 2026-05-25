@@ -51,8 +51,12 @@ export default function ClientLayout({
       // Employee and other roles can access client area
       setIsAuthorized(true);
       fetchUnreadCount()
-        .then((count) => { if (mountedRef.current) setUnreadCount(count); })
-        .catch(() => { /* ignore */ });
+        .then((count) => {
+          if (mountedRef.current) setUnreadCount(count);
+        })
+        .catch(() => {
+          /* ignore */
+        });
     }
   }, [router]);
 
@@ -87,7 +91,7 @@ export default function ClientLayout({
           isCollapsed ? "w-20" : "w-64",
         )}
       >
-        <div className="flex flex-col h-full">
+        <div className="flex h-full flex-col">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-sm font-semibold text-white">
               P
@@ -105,7 +109,7 @@ export default function ClientLayout({
             </div>
           </div>
 
-          <nav className="mt-8 flex flex-1 flex-col gap-2">
+          <nav className="mt-8 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 sidebar-scroll">
             <Link
               href="/client/dashboard"
               className={cn(
@@ -167,7 +171,7 @@ export default function ClientLayout({
             </Link>
           </nav>
 
-          <div className="space-y-2 border-t border-white/10 pt-4">
+          <div className="shrink-0 space-y-2 border-t border-white/10 pt-4">
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold text-zinc-400 transition hover:bg-white/5"

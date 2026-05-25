@@ -87,7 +87,7 @@ const formatTimeAgo = (dateStr: string | null): string => {
 
 // ── Main Page Component ──
 
-export default function ItStaffNotificationsPage() {
+export default function AdminNotificationsPage() {
   const router = useRouter();
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -144,7 +144,7 @@ export default function ItStaffNotificationsPage() {
     };
   }, []);
 
-  // ── Mark as read and navigate ──
+  // ── Mark as seen and navigate ──
 
   const handleNotificationClick = async (notif: Notification) => {
     // Mark as seen optimistically
@@ -166,13 +166,13 @@ export default function ItStaffNotificationsPage() {
 
     // Navigate to the related ticket if one exists
     if (notif.ticket?.id) {
-      router.push(`/it-staff/tickets?ticketId=${notif.ticket.id}`);
+      router.push(`/admin/tickets?ticketId=${notif.ticket.id}`);
     } else {
-      router.push("/it-staff/tickets");
+      router.push("/admin/tickets");
     }
   };
 
-  // ── Mark all as read ──
+  // ── Mark all as seen ──
 
   const handleMarkAllAsRead = async () => {
     setIsMarkingAll(true);

@@ -7,7 +7,12 @@
  * - Convenience helpers for claiming/acknowledging tickets
  */
 
-import { assignTicket, fetchTickets, unassignTicket, updateTicket } from "./tickets";
+import {
+  assignTicket,
+  fetchTickets,
+  unassignTicket,
+  updateTicket,
+} from "./tickets";
 import type { Ticket } from "../types/tickets";
 import type {
   ItStaffDashboardStats,
@@ -19,8 +24,8 @@ import type { TicketPriority, TicketStatus } from "../types/tickets";
 export {
   fetchNotifications,
   fetchUnreadCount,
-  markNotificationRead,
-  markAllNotificationsRead,
+  markNotificationSeen,
+  markNotificationsSeen,
 } from "./notifications";
 
 // ── Ticket Queue (IT Staff View) ──

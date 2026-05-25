@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  Bell,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -19,6 +20,8 @@ import {
 } from "lucide-react";
 import { logout } from "@/lib/api/auth";
 import { getAuthSession } from "@/lib/api/client";
+import { fetchUnreadCount } from "@/lib/api/notifications";
+import NotificationBellDropdown from "@/components/it-staff/notification-bell-dropdown";
 import { cn } from "@/lib/utils";
 
 export default function AdminLayout({
@@ -31,6 +34,8 @@ export default function AdminLayout({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isSlaOpen, setIsSlaOpen] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number | null>(null);
+  const mountedRef = useRef(false);
 
   const isSlaActive =
     pathname === "/admin/sla-policies" ||
@@ -50,11 +55,25 @@ export default function AdminLayout({
       .replace(/[^a-z0-9]/g, "");
     if (role === "admin") {
       setIsAuthorized(true);
+      fetchUnreadCount()
+        .then((count) => {
+          if (mountedRef.current) setUnreadCount(count);
+        })
+        .catch(() => {
+          /* ignore */
+        });
     } else {
       // Redirect non-admin users to client dashboard
       router.replace("/client/dashboard");
     }
   }, [router]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Render a lightweight placeholder while client-side session validation runs
   if (!isAuthorized) {
@@ -87,7 +106,7 @@ export default function AdminLayout({
           isCollapsed ? "w-20" : "w-64",
         )}
       >
-        <div className="flex flex-col h-full">
+        <div className="flex h-full flex-col">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-sm font-semibold text-white">
               A
@@ -105,7 +124,7 @@ export default function AdminLayout({
             </div>
           </div>
 
-          <nav className="mt-8 flex flex-1 flex-col gap-2">
+          <nav className="mt-8 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 sidebar-scroll">
             <Link
               href="/admin/dashboard"
               className={cn(
@@ -185,6 +204,38 @@ export default function AdminLayout({
                 Known Issues
               </span>
             </Link>
+
+            <div className="relative">
+              <Link
+                href="/admin/notifications"
+                className={cn(
+                  "group relative flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold transition",
+                  pathname.startsWith("/admin/notifications")
+                    ? "bg-white/10 text-white"
+                    : "text-zinc-400 hover:bg-white/5",
+                )}
+              >
+                <Bell className="h-5 w-5 shrink-0" />
+                <span
+                  className={cn(
+                    "transition-all duration-300",
+                    isCollapsed && "w-0 overflow-hidden",
+                  )}
+                >
+                  Notifications
+                </span>
+                {unreadCount !== null && unreadCount > 0 ? (
+                  <span
+                    className={cn(
+                      "ml-auto inline-flex items-center justify-center rounded-full bg-rose-500/90 px-1.5 py-0.5 text-[10px] font-bold text-white",
+                      isCollapsed && "absolute -right-1 -top-1",
+                    )}
+                  >
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                ) : null}
+              </Link>
+            </div>
 
             {/* ── SLA parent menu ── */}
             <div>
@@ -314,7 +365,7 @@ export default function AdminLayout({
             </Link>
           </nav>
 
-          <div className="space-y-2 border-t border-white/10 pt-4">
+          <div className="shrink-0 space-y-2 border-t border-white/10 pt-4">
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm font-semibold text-zinc-400 transition hover:bg-white/5"
@@ -358,6 +409,11 @@ export default function AdminLayout({
           isCollapsed ? "ml-20" : "ml-64",
         )}
       >
+        {/* Floating notification bell — bottom-right */}
+        <div className="fixed bottom-6 right-6 z-40">
+          <NotificationBellDropdown direction="up" basePath="/admin" />
+        </div>
+
         <div className="h-full overflow-y-auto">
           <div className="px-6 py-6 sm:px-8">{children}</div>
         </div>

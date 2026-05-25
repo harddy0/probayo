@@ -15,7 +15,7 @@ import {
 import {
   fetchNotifications,
   fetchUnreadCount,
-  markNotificationRead,
+  markNotificationSeen,
 } from "@/lib/api/notifications";
 import type { Notification, NotificationType } from "@/lib/types/notifications";
 import { cn } from "@/lib/utils";
@@ -68,7 +68,10 @@ const formatTimeAgo = (dateStr: string | null): string => {
   if (diffHours < 24) return `${diffHours}h`;
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `${diffDays}d`;
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(dateStr));
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(new Date(dateStr));
 };
 
 // ── Dropdown Component ──
@@ -135,7 +138,10 @@ export default function NotificationBellDropdown({
     void loadRecent();
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
@@ -156,12 +162,12 @@ export default function NotificationBellDropdown({
   };
 
   const handleNotificationClick = async (notif: Notification) => {
-    // Mark as read
+    // Mark as seen
     try {
-      await markNotificationRead(notif.id);
+      await markNotificationSeen(notif.id);
       setUnreadCount((prev) => (prev !== null ? Math.max(0, prev - 1) : prev));
       setRecent((prev) =>
-        prev.map((n) => (n.id === notif.id ? { ...n, readAt: new Date().toISOString() } : n)),
+        prev.map((n) => (n.id === notif.id ? { ...n, isSeen: true } : n)),
       );
     } catch {
       // Non-critical
@@ -193,13 +199,17 @@ export default function NotificationBellDropdown({
 
       {/* Dropdown */}
       {isOpen ? (
-        <div className={cn(
-          "absolute right-0 z-[300] w-80 overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl backdrop-blur-xl",
-          direction === "down" ? "top-full mt-2" : "bottom-full mb-2",
-        )}>
+        <div
+          className={cn(
+            "absolute right-0 z-[300] w-80 overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl backdrop-blur-xl",
+            direction === "down" ? "top-full mt-2" : "bottom-full mb-2",
+          )}
+        >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
-            <span className="text-xs font-semibold text-zinc-100">Notifications</span>
+            <span className="text-xs font-semibold text-zinc-100">
+              Notifications
+            </span>
             <button
               type="button"
               onClick={() => {
@@ -226,8 +236,9 @@ export default function NotificationBellDropdown({
             ) : (
               <div className="divide-y divide-white/[0.06]">
                 {recent.map((notif) => {
-                  const cfg = typeConfig[notif.type] ?? typeConfig.TicketCreated;
-                  const isUnread = !notif.readAt;
+                  const cfg =
+                    typeConfig[notif.type] ?? typeConfig.TicketCreated;
+                  const isUnread = !notif.isSeen;
 
                   return (
                     <button

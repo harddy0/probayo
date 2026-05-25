@@ -19,8 +19,7 @@ export type NotificationChannel = "Email" | "InApp";
 export type NotificationRecipient = {
   id: string;
   email: string;
-  firstName?: string;
-  lastName?: string;
+  fullName?: string;
 };
 
 export type NotificationTicketRef = {
@@ -34,11 +33,11 @@ export type Notification = {
   ticket: NotificationTicketRef | null;
   type: NotificationType;
   channel: NotificationChannel;
-  subject: string;
+  subject?: string | null;
   body: string;
+  isSeen: boolean;
   sentAt: string | null;
   createdAt: string;
-  readAt?: string | null;
 };
 
 export type UnreadCountResponse = {
