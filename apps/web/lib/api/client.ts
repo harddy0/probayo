@@ -193,7 +193,8 @@ const buildUrl = (path: string) => {
  *
  * Attempts to parse response body as JSON (backend error details).
  * Falls back to plain text if JSON parsing fails.
- * Preserves HTTP status and status text for client handling.
+ * Extracts a meaningful message from the response body when possible
+ * (the backend sends { message: "..." } in error responses).
  */
 const toApiError = async (response: Response): Promise<ApiError> => {
   let details: unknown = null;
@@ -204,9 +205,22 @@ const toApiError = async (response: Response): Promise<ApiError> => {
     details = await response.text();
   }
 
+  // Extract a meaningful message from the response body
+  const bodyMessage =
+    typeof details === "object" &&
+    details !== null &&
+    "message" in details
+      ? (details as Record<string, unknown>).message
+      : typeof details === "string"
+        ? details
+        : null;
+
   return {
     status: response.status,
-    message: response.statusText || "Request failed",
+    message:
+      typeof bodyMessage === "string" && bodyMessage.length > 0
+        ? bodyMessage
+        : response.statusText || "Request failed",
     details,
   };
 };

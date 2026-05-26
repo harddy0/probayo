@@ -1011,79 +1011,83 @@ export default function ItStaffTicketsPage() {
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                          {/* Accept / Claim */}
-                          {isUnassigned ? (
+                          {ticket.status === "Closed" ? (
+                            <span className="text-[11px] text-zinc-600">Closed</span>
+                          ) : (
                             <>
-                              <button
-                                type="button"
-                                onClick={() => handleClaimAndAcknowledge(ticket.id)}
-                                disabled={isActionLoading}
-                                className="inline-flex items-center gap-1 rounded-xl bg-white/10 px-3 py-1.5 text-[11px] font-medium text-zinc-200 transition hover:bg-white/20 disabled:opacity-50"
-                              >
-                                {isActionLoading ? (
-                                  <Loader className="h-3 w-3 animate-spin" />
-                                ) : (
-                                  <CheckCircle2 className="h-3 w-3" />
-                                )}
-                                Accept
-                              </button>
-                            </>
-                          ) : null}
+                              {/* Accept / Claim */}
+                              {isUnassigned ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleClaimAndAcknowledge(ticket.id)}
+                                  disabled={isActionLoading}
+                                  className="inline-flex items-center gap-1 rounded-xl bg-white/10 px-3 py-1.5 text-[11px] font-medium text-zinc-200 transition hover:bg-white/20 disabled:opacity-50"
+                                >
+                                  {isActionLoading ? (
+                                    <Loader className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <CheckCircle2 className="h-3 w-3" />
+                                  )}
+                                  Accept
+                                </button>
+                              ) : null}
 
-                          {/* Status dropdown (assigned tickets) */}
-                          {isAssignedToMe && availableStatuses.length > 0 ? (
-                            <div className="relative" ref={statusMenuOpen === ticket.id ? statusMenuRef : undefined}>
-                              <button
-                                type="button"
-                                onClick={() => setStatusMenuOpen(statusMenuOpen === ticket.id ? null : ticket.id)}
-                                disabled={isActionLoading && actionState?.type === "status"}
-                                className="inline-flex items-center gap-1 rounded-xl bg-white/10 px-3 py-1.5 text-[11px] font-medium text-zinc-200 transition hover:bg-white/20 disabled:opacity-50"
-                              >
-                                {isActionLoading && actionState?.type === "status" ? (
-                                  <Loader className="h-3 w-3 animate-spin" />
-                                ) : (
-                                  <ChevronDown className="h-3 w-3" />
-                                )}
-                                Status
-                              </button>
-                              {statusMenuOpen === ticket.id ? (
-                                <div className="absolute right-0 bottom-full z-50 mb-1 w-44 overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl backdrop-blur-xl">
-                                  {availableStatuses.map((s) => (
-                                    <button
-                                      key={s}
-                                      type="button"
-                                      onClick={() => handleStatusChange(ticket.id, s)}
-                                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-zinc-300 transition hover:bg-white/5 hover:text-white"
-                                    >
-                                      <span className={cn(
-                                        "inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wider",
-                                        statusStyles[s],
-                                      )}>
-                                        {statusLabels[s]}
-                                      </span>
-                                    </button>
-                                  ))}
+                              {/* Status dropdown (assigned tickets) */}
+                              {isAssignedToMe && availableStatuses.length > 0 ? (
+                                <div className="relative" ref={statusMenuOpen === ticket.id ? statusMenuRef : undefined}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setStatusMenuOpen(statusMenuOpen === ticket.id ? null : ticket.id)}
+                                    disabled={isActionLoading && actionState?.type === "status"}
+                                    className="inline-flex items-center gap-1 rounded-xl bg-white/10 px-3 py-1.5 text-[11px] font-medium text-zinc-200 transition hover:bg-white/20 disabled:opacity-50"
+                                  >
+                                    {isActionLoading && actionState?.type === "status" ? (
+                                      <Loader className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <ChevronDown className="h-3 w-3" />
+                                    )}
+                                    Status
+                                  </button>
+                                  {statusMenuOpen === ticket.id ? (
+                                    <div className="absolute right-0 bottom-full z-50 mb-1 w-44 overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl backdrop-blur-xl">
+                                      {availableStatuses.map((s) => (
+                                        <button
+                                          key={s}
+                                          type="button"
+                                          onClick={() => handleStatusChange(ticket.id, s)}
+                                          className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-zinc-300 transition hover:bg-white/5 hover:text-white"
+                                        >
+                                          <span className={cn(
+                                            "inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wider",
+                                            statusStyles[s],
+                                          )}>
+                                            {statusLabels[s]}
+                                          </span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  ) : null}
                                 </div>
                               ) : null}
-                            </div>
-                          ) : null}
 
-                          {/* Release */}
-                          {isAssignedToMe ? (
-                            <button
-                              type="button"
-                              onClick={() => handleReleaseTicket(ticket.id)}
-                              disabled={isActionLoading && actionState?.type === "release"}
-                              className="inline-flex items-center gap-1 rounded-xl border border-white/10 px-3 py-1.5 text-[11px] font-medium text-zinc-400 transition hover:border-rose-500/30 hover:text-rose-300 disabled:opacity-50"
-                            >
-                              {isActionLoading && actionState?.type === "release" ? (
-                                <Loader className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <LogOut className="h-3 w-3" />
-                              )}
-                              Release
-                            </button>
-                          ) : null}
+                              {/* Release */}
+                              {isAssignedToMe ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleReleaseTicket(ticket.id)}
+                                  disabled={isActionLoading && actionState?.type === "release"}
+                                  className="inline-flex items-center gap-1 rounded-xl border border-white/10 px-3 py-1.5 text-[11px] font-medium text-zinc-400 transition hover:border-rose-500/30 hover:text-rose-300 disabled:opacity-50"
+                                >
+                                  {isActionLoading && actionState?.type === "release" ? (
+                                    <Loader className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <LogOut className="h-3 w-3" />
+                                  )}
+                                  Release
+                                </button>
+                              ) : null}
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1102,10 +1106,10 @@ export default function ItStaffTicketsPage() {
               className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/80 backdrop-blur-xl"
               onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }}
             >
-              <div className="mx-4 my-6 w-full max-w-3xl sm:mx-auto">
-                <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-lg border border-white/10 bg-zinc-900/95 shadow-2xl backdrop-blur-xl">
+              <div className="mx-4 my-6 w-full max-w-7xl sm:mx-auto">
+                <div className="flex max-h-[88vh] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-zinc-900/95 shadow-2xl backdrop-blur-xl">
                   {/* Modal Header */}
-                  <div className="flex items-start justify-between border-b border-white/[0.06] px-6 py-5">
+                  <div className="flex items-start justify-between border-b border-white/[0.06] px-5 py-4">
                     <div className="min-w-0 flex-1">
                       {isDetailLoading ? (
                         <div className="flex items-center gap-3">
@@ -1206,6 +1210,7 @@ export default function ItStaffTicketsPage() {
                                       );
                                     })()}
 
+                                    {/* Release button - ticket is not Closed in this branch */}
                                     <button
                                       type="button"
                                       onClick={() => void handleReleaseTicket(selectedTicket.id)}
@@ -1232,7 +1237,7 @@ export default function ItStaffTicketsPage() {
                   </div>
 
                   {/* Tab Bar */}
-                  <div className="flex gap-0 border-b border-white/[0.06] px-6">
+                  <div className="flex gap-0 border-b border-white/[0.06] px-5">
                     {([
                       { id: "details" as const, label: "Details" },
                       { id: "attachments" as const, label: "Attachments" },
@@ -1258,7 +1263,7 @@ export default function ItStaffTicketsPage() {
                   </div>
 
                   {/* Modal Body */}
-                  <div className="flex-1 overflow-y-auto p-6">
+                  <div className="flex-1 overflow-y-auto border-t border-white/[0.04] bg-gradient-to-b from-transparent to-black/[0.08] p-5">
                     {isDetailLoading ? (
                       <div className="flex items-center justify-center py-12">
                         <Loader className="h-6 w-6 animate-spin text-zinc-400" />
@@ -1274,130 +1279,170 @@ export default function ItStaffTicketsPage() {
                       <>
                         {/* ── Details Tab ── */}
                         {activeTab === "details" ? (
-                          <div className="space-y-6">
-                            {/* Description */}
-                            <div className="rounded-lg border border-white/10 bg-white/5 p-5">
-                              <p className="mb-2 text-[10px] uppercase tracking-widest text-zinc-500">Description</p>
-                              <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-200">
-                                {selectedTicket.description}
-                              </p>
-                            </div>
-
-                            {/* ── Status Pipeline ── */}
-                            <StatusPipeline
-                              currentStatus={selectedTicket.status}
-                              isStaff={selectedTicket.assignedToUserId === currentUserId}
-                              onStatusClick={
-                                selectedTicket.assignedToUserId === currentUserId
-                                  ? (s) => void handleStatusChange(selectedTicket.id, s)
-                                  : undefined
-                              }
-                            />
-
-                            {/* ── Known Issue Section ── */}
-                            <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.03] p-4">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <Bug className="h-4 w-4 text-amber-400" />
-                                  <p className="text-[10px] uppercase tracking-widest text-amber-400/80">
-                                    Known Issue
+                          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
+                            {/* ── Left Column: Description, Pipeline, History ── */}
+                            <div className="space-y-6">
+                              {/* Description Card */}
+                              <div className="group relative overflow-hidden rounded-xl border border-white/[0.06] bg-gradient-to-br from-white/[0.04] to-white/[0.01] p-4 transition-all duration-200 hover:border-white/15">
+                                <div className="absolute -inset-1 rounded-xl bg-gradient-to-br from-emerald-500/[0.02] to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                                <div className="relative">
+                                  <div className="mb-2.5 flex items-center gap-2">
+                                    <div className="flex h-4 w-4 items-center justify-center rounded-md bg-zinc-800">
+                                      <svg className="h-2.5 w-2.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16m-7 6h7" />
+                                      </svg>
+                                    </div>
+                                    <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400">Description</span>
+                                  </div>
+                                  <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-200">
+                                    {selectedTicket.description}
                                   </p>
                                 </div>
-                                {selectedTicket.knownIssueId ? (
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      try {
-                                        await updateTicket(selectedTicket.id, { knownIssueId: null });
-                                        push({ title: "Detached", description: "Known issue removed from ticket.", variant: "success" });
-                                        await loadTicketDetail(selectedTicket.id);
-                                      } catch (err) {
-                                        push({ title: "Failed", description: isApiError(err) ? err.message : "Could not detach.", variant: "error" });
-                                      }
-                                    }}
-                                    className="text-xs text-zinc-500 transition hover:text-rose-300"
-                                  >
-                                    Detach
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSingleAttachTicketId(selectedTicket.id);
-                                      setIsBatchAttachOpen(true);
-                                    }}
-                                    className="text-xs text-amber-400 transition hover:text-amber-300"
-                                  >
-                                    Attach
-                                  </button>
-                                )}
                               </div>
-                              {selectedTicket.knownIssueId ? (
-                                <div className="mt-3 space-y-2">
-                                  <p className="text-sm text-zinc-400">
-                                    This ticket is linked to a known issue.
-                                  </p>
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleResolveAllUnderKnownIssue(selectedTicket.knownIssueId!)}
-                                    disabled={isResolvingAll}
-                                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-200 transition hover:bg-emerald-500/30 disabled:opacity-50"
-                                  >
-                                    {isResolvingAll ? (
-                                      <Loader className="h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                      <CheckCircle2 className="h-3.5 w-3.5" />
-                                    )}
-                                    Resolve all tickets under this issue
-                                  </button>
+
+                              {/* Status Pipeline */}
+                              <StatusPipeline
+                                currentStatus={selectedTicket.status}
+                                isStaff={selectedTicket.assignedToUserId === currentUserId}
+                                onStatusClick={
+                                  selectedTicket.assignedToUserId === currentUserId
+                                    ? (s) => void handleStatusChange(selectedTicket.id, s)
+                                    : undefined
+                                }
+                              />
+
+                              {/* Status History - Timeline */}
+                              {selectedTicket.statusHistory && selectedTicket.statusHistory.length > 0 ? (
+                                <div>
+                                  <div className="mb-3 flex items-center gap-2">
+                                    <div className="flex h-4 w-4 items-center justify-center rounded-md bg-zinc-800">
+                                      <svg className="h-2.5 w-2.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                    </div>
+                                    <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400">Status History</span>
+                                  </div>
+                                  <div className="relative">
+                                    <div className="absolute left-[11px] top-2 bottom-2 w-px bg-gradient-to-b from-white/20 via-white/10 to-transparent" />
+                                    <div className="space-y-0">
+                                      {selectedTicket.statusHistory.map((entry, idx) => {
+                                        const isLatest = idx === selectedTicket.statusHistory!.length - 1;
+                                        return (
+                                          <div key={entry.id} className="relative flex gap-4 pb-5">
+                                            <div className={cn(
+                                              "relative z-10 mt-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2",
+                                              isLatest
+                                                ? "border-emerald-400 bg-emerald-500/20"
+                                                : "border-zinc-600 bg-zinc-800",
+                                            )}>
+                                              {isLatest ? (
+                                                <CheckCircle2 className="h-2.5 w-2.5 text-emerald-300" />
+                                              ) : (
+                                                <div className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
+                                              )}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                              <div className="flex items-baseline justify-between gap-3">
+                                                <div className="flex items-center gap-1.5 text-sm">
+                                                  <span className="text-zinc-500">{entry.fromStatus ? statusLabels[entry.fromStatus] : "New"}</span>
+                                                  <span className="text-zinc-600">→</span>
+                                                  <span className="font-semibold text-zinc-100">{statusLabels[entry.toStatus]}</span>
+                                                </div>
+                                                <span className="shrink-0 text-[11px] text-zinc-500">{formatDateTime(entry.changedAt)}</span>
+                                              </div>
+                                              <p className="mt-0.5 text-[11px] text-zinc-500">by {formatUserName(entry.changedByUser)}</p>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
                                 </div>
                               ) : null}
                             </div>
 
-                            {/* Metadata Grid */}
-                            <div className="grid gap-3 sm:grid-cols-2">
-                              <MetadataItem label="Category" value={selectedTicket.category?.name || "—"} />
-                              <MetadataItem label="Asset" value={selectedTicket.asset?.deviceType || "—"} />
-                              <MetadataItem label="Requested by" value={formatUserName(selectedTicket.filedByUser)} />
-                              <MetadataItem label="Department" value={selectedTicket.department?.name || "—"} />
-                              <MetadataItem label="Assigned to" value={formatUserName(selectedTicket.assignedToUser)} />
-                              <MetadataItem label="Created" value={formatDateTime(selectedTicket.createdAt)} />
-                              <MetadataItem label="Updated" value={formatDateTime(selectedTicket.updatedAt)} />
-                              <MetadataItem label="Acknowledged" value={formatDateTime(selectedTicket.acknowledgedAt)} />
-                              <MetadataItem label="SLA Acknowledge" value={formatDateTime(selectedTicket.slaAckDeadline)} />
-                              <MetadataItem label="SLA Resolution" value={formatDateTime(selectedTicket.slaResolutionDeadline)} />
-                              <MetadataItem label="SLA Ack Breached" value={selectedTicket.slaAckBreached ? "Yes" : "No"} />
-                              <MetadataItem label="SLA Resolution Breached" value={selectedTicket.slaResolutionBreached ? "Yes" : "No"} />
-                            </div>
-
-                            {/* Status History */}
-                            {selectedTicket.statusHistory && selectedTicket.statusHistory.length > 0 ? (
-                              <div className="space-y-3">
-                                <p className="text-[10px] uppercase tracking-widest text-zinc-500">Status History</p>
-                                <div className="space-y-1.5">
-                                  {selectedTicket.statusHistory.map((entry) => (
-                                    <div
-                                      key={entry.id}
-                                      className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm"
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-zinc-500">
-                                          {entry.fromStatus ? statusLabels[entry.fromStatus] : "New"}
-                                        </span>
-                                        <span className="text-zinc-600">→</span>
-                                        <span className="font-medium text-zinc-200">
-                                          {statusLabels[entry.toStatus]}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center gap-3 text-xs text-zinc-500">
-                                        <span>{formatUserName(entry.changedByUser)}</span>
-                                        <span>{formatDateTime(entry.changedAt)}</span>
-                                      </div>
+                            {/* ── Right Column: Known Issue + Metadata Sidebar ── */}
+                            <div className="space-y-2.5">
+                              {/* Known Issue Section */}
+                              <div className="group relative overflow-hidden rounded-xl border border-amber-500/20 bg-gradient-to-br from-amber-500/[0.03] to-transparent p-3.5 transition-all duration-200 hover:border-amber-500/30">
+                                <div className="relative">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5">
+                                      <Bug className="h-3.5 w-3.5 text-amber-400" />
+                                      <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-amber-400/80">Known Issue</p>
                                     </div>
-                                  ))}
+                                    {selectedTicket.knownIssueId ? (
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          try {
+                                            await updateTicket(selectedTicket.id, { knownIssueId: null });
+                                            push({ title: "Detached", description: "Known issue removed from ticket.", variant: "success" });
+                                            await loadTicketDetail(selectedTicket.id);
+                                          } catch (err) {
+                                            push({ title: "Failed", description: isApiError(err) ? err.message : "Could not detach.", variant: "error" });
+                                          }
+                                        }}
+                                        className="rounded-lg px-2.5 py-1 text-xs font-medium text-zinc-400 transition hover:bg-rose-500/10 hover:text-rose-300"
+                                      >
+                                        Detach
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSingleAttachTicketId(selectedTicket.id);
+                                          setIsBatchAttachOpen(true);
+                                        }}
+                                        className="rounded-lg px-2.5 py-1 text-xs font-medium text-amber-400 transition hover:bg-amber-500/10 hover:text-amber-300"
+                                      >
+                                        Attach
+                                      </button>
+                                    )}
+                                  </div>
+                                  {selectedTicket.knownIssueId ? (
+                                    <div className="mt-3">
+                                      <p className="text-sm text-zinc-400">This ticket is linked to a known issue.</p>
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleResolveAllUnderKnownIssue(selectedTicket.knownIssueId!)}
+                                        disabled={isResolvingAll}
+                                        className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-200 transition hover:bg-emerald-500/30 disabled:opacity-50"
+                                      >
+                                        {isResolvingAll ? <Loader className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                                        Resolve all
+                                      </button>
+                                    </div>
+                                  ) : null}
                                 </div>
                               </div>
-                            ) : null}
+
+                              {/* Metadata Sidebar */}
+                              <div>
+                                <div className="mb-2.5 flex items-center gap-1.5">
+                                  <div className="flex h-4 w-4 items-center justify-center rounded-md bg-zinc-800">
+                                    <svg className="h-2.5 w-2.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                  </div>
+                                  <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-500">Ticket Details</span>
+                                </div>
+                                <div className="space-y-1.5">
+                                  <ModernMetadataItem icon="folder" label="Category" value={selectedTicket.category?.name || "—"} />
+                                  <ModernMetadataItem icon="monitor" label="Asset" value={selectedTicket.asset?.deviceType || "—"} />
+                                  <ModernMetadataItem icon="user" label="Requested by" value={formatUserName(selectedTicket.filedByUser)} />
+                                  <ModernMetadataItem icon="building" label="Department" value={selectedTicket.department?.name || "—"} />
+                                  <ModernMetadataItem icon="target" label="Assigned to" value={formatUserName(selectedTicket.assignedToUser)} />
+                                  <ModernMetadataItem icon="calendar" label="Created" value={formatDateTime(selectedTicket.createdAt)} />
+                                  <ModernMetadataItem icon="calendar" label="Updated" value={formatDateTime(selectedTicket.updatedAt)} />
+                                  <ModernMetadataItem icon="check" label="Acknowledged" value={formatDateTime(selectedTicket.acknowledgedAt)} />
+                                  <ModernMetadataItem icon="clock" label="SLA Acknowledge" value={formatDateTime(selectedTicket.slaAckDeadline)} />
+                                  <ModernMetadataItem icon="clock" label="SLA Resolution" value={formatDateTime(selectedTicket.slaResolutionDeadline)} />
+                                  <ModernMetadataItem icon="alert" label="SLA Ack Breached" value={selectedTicket.slaAckBreached ? "Yes" : "No"} />
+                                  <ModernMetadataItem icon="alert" label="SLA Resolution Breached" value={selectedTicket.slaResolutionBreached ? "Yes" : "No"} />
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         ) : null}
 
@@ -1619,11 +1664,42 @@ export default function ItStaffTicketsPage() {
   );
 }
 
-function MetadataItem({ label, value }: { label: string; value: string }) {
+// ── Modern Metadata Item ──
+
+const metadataIconMap: Record<string, React.ReactNode> = {
+  folder: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>,
+  monitor: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
+  user: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
+  building: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
+  target: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+  calendar: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+  check: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+  clock: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+  alert: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>,
+};
+
+function ModernMetadataItem({ icon, label, value }: { icon: string; label: string; value: string }) {
+  const isBreached = value === "Yes" && (label.includes("Breached"));
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-      <p className="text-[10px] uppercase tracking-widest text-zinc-500">{label}</p>
-      <p className="mt-1.5 text-sm text-zinc-100">{value}</p>
+    <div className="group relative overflow-hidden rounded-lg border border-white/[0.05] bg-gradient-to-br from-white/[0.02] to-transparent px-3 py-2 transition-all duration-200 hover:border-white/[0.1] hover:from-white/[0.04]">
+      <div className="flex items-center gap-2.5">
+        <div className={cn(
+          "flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors",
+          isBreached ? "bg-rose-500/15 text-rose-400" : "bg-zinc-800/60 text-zinc-500 group-hover:text-zinc-400",
+        )}>
+          {metadataIconMap[icon]}
+        </div>
+        <div className="min-w-0">
+          <p className={cn(
+            "text-[11px] font-medium uppercase tracking-[0.12em]",
+            isBreached ? "text-rose-400" : "text-zinc-500",
+          )}>{label}</p>
+          <p className={cn(
+            "truncate text-xs font-medium",
+            value === "—" ? "text-zinc-500" : isBreached ? "text-rose-200" : "text-zinc-100",
+          )}>{value}</p>
+        </div>
+      </div>
     </div>
   );
 }
