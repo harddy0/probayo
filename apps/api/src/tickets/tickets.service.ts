@@ -255,8 +255,6 @@ export class TicketsService {
       throw new NotFoundException(`Ticket ${id} not found`);
     }
 
-    this.ensureTicketAssignable(ticket);
-
     // Check permissions
     const canView = this.canViewTicket(user, ticket);
     if (!canView) {
@@ -726,6 +724,10 @@ export class TicketsService {
 
     if (!ticket) {
       throw new NotFoundException(`Ticket ${id} not found`);
+    }
+
+    if (ticket.status === TicketStatus.Closed) {
+      throw new BadRequestException('Closed tickets cannot be unassigned');
     }
 
     const actor = await this.prisma.user.findUnique({

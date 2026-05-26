@@ -154,11 +154,15 @@ export class TicketsController {
   @ApiOperation({
     summary: 'Assign ticket to IT staff (Admin assigns, IT can self-assign)',
     description:
-      'Admins can assign any IT staff but cannot self-assign. IT staff can only assign themselves.',
+      'Admins can assign any IT staff but cannot self-assign. IT staff can only assign themselves. Closed tickets cannot be assigned.',
   })
   @ApiParam({ name: 'id', description: 'Ticket UUID' })
   @ApiParam({ name: 'userId', description: 'User UUID to assign' })
   @ApiResponse({ status: 200, description: 'Ticket assigned successfully' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - closed tickets cannot be assigned',
+  })
   assign(
     @Param('id') id: string,
     @Param('userId') userId: string,
@@ -174,10 +178,14 @@ export class TicketsController {
   @ApiOperation({
     summary: 'Unassign ticket (Admin/IT only)',
     description:
-      'Admins can unassign any ticket. IT staff can only unassign themselves.',
+      'Admins can unassign any ticket. IT staff can only unassign themselves. Closed tickets cannot be unassigned.',
   })
   @ApiParam({ name: 'id', description: 'Ticket UUID' })
   @ApiResponse({ status: 200, description: 'Ticket unassigned successfully' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - closed tickets cannot be unassigned',
+  })
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   unassign(@Param('id') id: string, @Request() req: { user: { id: string } }) {
     return this.ticketsService.unassignTicket(id, req.user.id);
