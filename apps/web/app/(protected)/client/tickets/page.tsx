@@ -95,7 +95,7 @@ const statusStyles: Record<TicketStatus, string> = {
   PendingUser: "border-amber-500/30 bg-amber-500/10 text-amber-200",
   InProgress: "border-indigo-500/30 bg-indigo-500/10 text-indigo-200",
   Resolved: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
-  Closed: "border-zinc-500/30 bg-zinc-500/10 text-zinc-300",
+  Closed: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
 };
 
 const priorityStyles: Record<TicketPriority, string> = {

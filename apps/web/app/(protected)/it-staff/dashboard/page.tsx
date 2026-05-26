@@ -181,7 +181,7 @@ export default function ItStaffDashboard() {
           PendingUser: "amber",
           InProgress: "indigo",
           Resolved: "emerald",
-          Closed: "zinc",
+          Closed: "emerald",
         } as Record<string, string>)[key] || "zinc",
       }))
     : [];

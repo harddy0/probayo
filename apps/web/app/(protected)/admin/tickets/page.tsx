@@ -91,7 +91,7 @@ const statusStyles: Record<TicketStatus, string> = {
   PendingUser: "border-amber-500/30 bg-amber-500/10 text-amber-200",
   InProgress: "border-indigo-500/30 bg-indigo-500/10 text-indigo-200",
   Resolved: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
-  Closed: "border-zinc-500/30 bg-zinc-500/10 text-zinc-300",
+  Closed: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
 };
 
 const priorityStyles: Record<TicketPriority, string> = {
@@ -109,7 +109,7 @@ const PROG_COLORS = [
   "bg-amber-500/50",
   "bg-indigo-500/50",
   "bg-emerald-500/50",
-  "bg-zinc-500/30",
+  "bg-emerald-500/50",
 ] as const;
 
 type UploadStatus = "uploading" | "processing" | "completed" | "failed";
@@ -1028,28 +1028,35 @@ export default function AdminTicketsPage() {
                           </div>
 
                           {/* Admin Action Bar */}
-                          {selectedTicket.status !== "Closed" ? (
-                            <div className="mt-3 flex items-center gap-2">
-                              {!selectedTicket.assignedToUserId ? (
-                                <Button
-                                  className="h-8 text-xs"
-                                  onClick={() => setAssignTicketId(selectedTicket.id)}
-                                >
-                                  <UserPlus className="mr-1.5 h-3.5 w-3.5" />
-                                  Assign to IT staff
-                                </Button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleUnassign(selectedTicket.id)}
-                                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/20 px-3 py-1.5 text-xs font-medium text-rose-300 transition hover:bg-rose-500/10"
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                  Unassign
-                                </button>
-                              )}
-                            </div>
-                          ) : null}
+                          <div className="mt-3 flex items-center gap-2">
+                            {selectedTicket.status === "Closed" ? (
+                              <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                Ticket closed
+                              </span>
+                            ) : (
+                              <>
+                                {!selectedTicket.assignedToUserId ? (
+                                  <Button
+                                    className="h-8 text-xs"
+                                    onClick={() => setAssignTicketId(selectedTicket.id)}
+                                  >
+                                    <UserPlus className="mr-1.5 h-3.5 w-3.5" />
+                                    Assign to IT staff
+                                  </Button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUnassign(selectedTicket.id)}
+                                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/20 px-3 py-1.5 text-xs font-medium text-rose-300 transition hover:bg-rose-500/10"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                    Unassign
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </>
                       ) : null}
                     </div>

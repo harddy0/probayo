@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import {
   AlertCircle,
+  ArrowRight,
   Bug,
   CheckCircle2,
   ChevronDown,
@@ -106,7 +107,7 @@ const statusStyles: Record<TicketStatus, string> = {
   PendingUser: "border-amber-500/30 bg-amber-500/10 text-amber-200",
   InProgress: "border-indigo-500/30 bg-indigo-500/10 text-indigo-200",
   Resolved: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
-  Closed: "border-zinc-500/30 bg-zinc-500/10 text-zinc-300",
+  Closed: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
 };
 
 const priorityStyles: Record<TicketPriority, string> = {
@@ -124,17 +125,16 @@ const PROG_COLORS = [
   "bg-amber-500/50",
   "bg-indigo-500/50",
   "bg-emerald-500/50",
-  "bg-zinc-500/30",
+  "bg-emerald-500/50",
 ] as const;
 
-const statusFlows: Record<TicketStatus, TicketStatus[]> = {
-  Open: ["Acknowledged", "InProgress", "Resolved", "Closed"],
-  Acknowledged: ["InProgress", "Resolved", "Closed"],
-  PendingUser: ["Acknowledged", "InProgress", "Resolved", "Closed"],
-  InProgress: ["PendingUser", "Resolved", "Closed"],
-  Resolved: ["Closed"],
-  Closed: [],
+const getNextStatus = (current: TicketStatus): TicketStatus | null => {
+  const idx = STATUS_ORDER.indexOf(current);
+  if (idx < 0 || idx >= STATUS_ORDER.length - 1) return null;
+  return STATUS_ORDER[idx + 1] as TicketStatus;
 };
+
+
 
 type UploadStatus = "uploading" | "processing" | "completed" | "failed";
 
@@ -589,7 +589,27 @@ export default function ItStaffTicketsPage() {
     }
   };
 
+  /** Validate that the transition follows the strict sequential order */
+  const isValidTransition = (current: TicketStatus, target: TicketStatus): boolean => {
+    const currentIdx = STATUS_ORDER.indexOf(current);
+    const targetIdx = STATUS_ORDER.indexOf(target);
+    if (currentIdx < 0 || targetIdx < 0) return false;
+    // Only allow forward (+1)
+    return targetIdx === currentIdx + 1;
+  };
+
   const handleStatusChange = async (ticketId: string, newStatus: TicketStatus) => {
+    // Find ticket from local state to validate transition (works for both modal & inline dropdown)
+    const currentTicket = tickets.find(t => t.id === ticketId);
+    if (!currentTicket) return;
+    if (!isValidTransition(currentTicket.status, newStatus)) {
+      push({
+        title: "Invalid transition",
+        description: `Cannot go from ${statusLabels[currentTicket.status]} to ${statusLabels[newStatus]}. Must follow: Open → Acknowledged → PendingUser → InProgress → Resolved → Closed`,
+        variant: "error",
+      });
+      return;
+    }
     setActionState({ type: "status", ticketId, loading: true });
     setStatusMenuOpen(null);
     try {
@@ -899,8 +919,9 @@ export default function ItStaffTicketsPage() {
                   const isActionLoading = actionState?.ticketId === ticket.id && actionState.loading;
                   const isAssignedToMe = ticket.assignedToUserId === currentUserId;
                   const isUnassigned = !ticket.assignedToUserId;
-                  const availableStatuses = statusFlows[ticket.status] ?? [];
-
+                  // Only show forward (next) status in inline dropdown
+                  const nextForInline = getNextStatus(ticket.status);
+                  const availableStatuses = nextForInline ? [nextForInline] : [];
 
                   const currentIdx = STATUS_ORDER.indexOf(ticket.status as typeof STATUS_ORDER[number]);
 
@@ -1127,43 +1148,77 @@ export default function ItStaffTicketsPage() {
                           </div>
 
                           {/* Modal Action Bar */}
-                          {selectedTicket.status !== "Closed" ? (
-                            <div className="mt-3 flex items-center gap-2">
-                              {!selectedTicket.assignedToUserId && currentUserId ? (
-                                <Button
-                                  className="h-8 text-xs"
-                                  onClick={() => {
-                                    void handleClaimAndAcknowledge(selectedTicket.id);
-                                  }}
-                                >
-                                  <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                                  Accept &amp; acknowledge
-                                </Button>
-                              ) : null}
-                              {selectedTicket.assignedToUserId === currentUserId ? (
-                                <>
-                                  {(statusFlows[selectedTicket.status] ?? []).slice(0, 3).map((s) => (
-                                    <button
-                                      key={s}
-                                      type="button"
-                                      onClick={() => void handleStatusChange(selectedTicket.id, s)}
-                                      className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:bg-white/15"
-                                    >
-                                      {s === "Resolved" ? "Resolve" : s === "InProgress" ? "Start work" : statusLabels[s]}
-                                    </button>
-                                  ))}
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleReleaseTicket(selectedTicket.id)}
-                                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/20 px-3 py-1.5 text-xs font-medium text-rose-300 transition hover:bg-rose-500/10"
+                          <div className="mt-3 flex items-center gap-2">
+                            {selectedTicket.status === "Closed" ? (
+                              <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                Ticket closed
+                              </span>
+                            ) : (
+                              <>
+                                {!selectedTicket.assignedToUserId && currentUserId ? (
+                                  <Button
+                                    className="h-8 text-xs"
+                                    onClick={() => {
+                                      void handleClaimAndAcknowledge(selectedTicket.id);
+                                    }}
                                   >
-                                    <LogOut className="h-3.5 w-3.5" />
-                                    Release
-                                  </button>
-                                </>
-                              ) : null}
-                            </div>
-                          ) : null}
+                                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                                    Accept &amp; acknowledge
+                                  </Button>
+                                ) : null}
+                                {selectedTicket.assignedToUserId === currentUserId ? (
+                                  <>
+                                    {/* Current status badge */}
+                                    <span className={cn(
+                                      "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                                      statusStyles[selectedTicket.status],
+                                    )}>
+                                      {statusLabels[selectedTicket.status]}
+                                    </span>
+
+                                    {/* Advance to next sequential status */}
+                                    {(() => {
+                                      const next = getNextStatus(selectedTicket.status);
+                                      if (!next) return null;
+                                      return (
+                                        <>
+                                          <ArrowRight className="h-3.5 w-3.5 text-zinc-600" />
+                                          <button
+                                            type="button"
+                                            onClick={() => void handleStatusChange(selectedTicket.id, next)}
+                                            className={cn(
+                                              "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all duration-150 hover:scale-105 active:scale-95",
+                                              next === "PendingUser"
+                                                ? "border-amber-500/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20"
+                                                : next === "InProgress"
+                                                  ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20"
+                                                  : next === "Resolved"
+                                                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
+                                                    : next === "Closed"
+                                                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
+                                                      : "border-white/10 bg-white/5 text-zinc-200 hover:bg-white/15",
+                                            )}
+                                          >
+                                            {statusLabels[next]}
+                                          </button>
+                                        </>
+                                      );
+                                    })()}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleReleaseTicket(selectedTicket.id)}
+                                      className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/20 px-3 py-1.5 text-xs font-medium text-rose-300 transition hover:bg-rose-500/10"
+                                    >
+                                      <LogOut className="h-3.5 w-3.5" />
+                                      Release
+                                    </button>
+                                  </>
+                                ) : null}
+                              </>
+                            )}
+                          </div>
                         </>
                       ) : null}
                     </div>
