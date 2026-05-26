@@ -309,6 +309,8 @@ export class TicketsService {
     } | null = null;
 
     if (isAssigning) {
+      this.ensureTicketAssignable(existingTicket);
+
       if (user.role !== UserRole.Admin && user.role !== UserRole.ItStaff) {
         throw new ForbiddenException(
           'Only admins and IT staff can assign tickets',
@@ -642,6 +644,8 @@ export class TicketsService {
       throw new NotFoundException(`Ticket ${id} not found`);
     }
 
+    this.ensureTicketAssignable(ticket);
+
     const actor = await this.prisma.user.findUnique({
       where: { id: actorUserId },
     });
@@ -720,6 +724,10 @@ export class TicketsService {
 
     if (!ticket) {
       throw new NotFoundException(`Ticket ${id} not found`);
+    }
+
+    if (ticket.status === TicketStatus.Closed) {
+      throw new BadRequestException('Closed tickets cannot be unassigned');
     }
 
     const actor = await this.prisma.user.findUnique({
@@ -915,6 +923,12 @@ export class TicketsService {
         return user.id === ticket.filedByUserId;
       default:
         return false;
+    }
+  }
+
+  private ensureTicketAssignable(ticket: { status: TicketStatus }) {
+    if (ticket.status === TicketStatus.Closed) {
+      throw new BadRequestException('Closed tickets cannot be assigned');
     }
   }
 }
