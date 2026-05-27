@@ -16,6 +16,7 @@ import {
   Inbox,
   Loader,
   LogOut,
+  Plus,
   RefreshCw,
   Search,
   TicketCheck,
@@ -67,6 +68,7 @@ import type { KnownIssue } from "@/lib/types/known-issues";
 import type { ItStaffTicketView } from "@/lib/types/it-staff";
 import StatusPipeline from "@/components/it-staff/status-pipeline";
 import BatchAttachModal from "@/components/it-staff/batch-attach-modal";
+import CreateKnownIssueModal from "@/components/known-issues/create-known-issue-modal";
 import { cn } from "@/lib/utils";
 
 // ── Constants ──
@@ -352,6 +354,9 @@ export default function ItStaffTicketsPage() {
   const [isResolvingAll, setIsResolvingAll] = useState(false);
   const [singleAttachTicketId, setSingleAttachTicketId] = useState<string | null>(null);
 
+  // ── Create Known Issue from Ticket State (uses shared modal) ──
+  const [createKiTicketId, setCreateKiTicketId] = useState<string | null>(null);
+
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -394,6 +399,19 @@ export default function ItStaffTicketsPage() {
       push({ title: "Failed", description: isApiError(err) ? err.message : "Could not resolve tickets.", variant: "error" });
     } finally {
       setIsResolvingAll(false);
+    }
+  };
+
+  const handleCreatedKnownIssueAttach = async (issue: KnownIssue, ticketId: string) => {
+    try {
+      const updated = await updateTicket(ticketId, {
+        knownIssueId: issue.id,
+      });
+      push({ title: "Known issue attached", description: `${issue.title} linked to this ticket.`, variant: "success" });
+      setSelectedTicket(updated);
+      await loadTickets();
+    } catch (err) {
+      push({ title: "Failed", description: isApiError(err) ? err.message : "Could not attach known issue.", variant: "error" });
     }
   };
 
@@ -1388,16 +1406,26 @@ export default function ItStaffTicketsPage() {
                                         Detach
                                       </button>
                                     ) : (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setSingleAttachTicketId(selectedTicket.id);
-                                          setIsBatchAttachOpen(true);
-                                        }}
-                                        className="rounded-lg px-2.5 py-1 text-xs font-medium text-amber-400 transition hover:bg-amber-500/10 hover:text-amber-300"
-                                      >
-                                        Attach
-                                      </button>
+                                      <div className="flex items-center gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setSingleAttachTicketId(selectedTicket.id);
+                                            setIsBatchAttachOpen(true);
+                                          }}
+                                          className="rounded-lg px-2.5 py-1 text-xs font-medium text-amber-400 transition hover:bg-amber-500/10 hover:text-amber-300"
+                                        >
+                                          Attach
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setCreateKiTicketId(selectedTicket.id)}
+                                          className="rounded-lg px-2.5 py-1 text-xs font-medium text-emerald-400 transition hover:bg-emerald-500/10 hover:text-emerald-300"
+                                        >
+                                          <Plus className="mr-1 inline h-3 w-3" />
+                                          Create &amp; attach
+                                        </button>
+                                      </div>
                                     )}
                                   </div>
                                   {selectedTicket.knownIssueId ? (
@@ -1649,6 +1677,21 @@ export default function ItStaffTicketsPage() {
             document.body,
           )
         : null}
+
+      {/* ── Create Known Issue Modal (shared) ── */}
+      <CreateKnownIssueModal
+        open={createKiTicketId !== null}
+        onClose={() => setCreateKiTicketId(null)}
+        onCreated={(issue) => {
+          const ticketId = createKiTicketId;
+          setCreateKiTicketId(null);
+          if (ticketId) {
+            void handleCreatedKnownIssueAttach(issue, ticketId);
+          }
+        }}
+        initialTitle={selectedTicket?.title ?? ""}
+        initialDescription={selectedTicket?.description ?? ""}
+      />
 
       {/* ── Batch Attach Modal ── */}
       <BatchAttachModal

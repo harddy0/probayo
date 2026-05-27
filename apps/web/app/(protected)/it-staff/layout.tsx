@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  AlertTriangle,
   Bell,
   HardDrive,
   LayoutDashboard,
@@ -17,6 +18,7 @@ import AppShell, { type NavItem } from "@/components/layout/app-shell";
 const navItems: NavItem[] = [
   { href: "/it-staff/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/it-staff/tickets", label: "Tickets", icon: TicketCheck },
+  { href: "/it-staff/known-issues", label: "Known Issues", icon: AlertTriangle },
   { href: "/it-staff/assets", label: "Assets", icon: HardDrive },
   { href: "/it-staff/notifications", label: "Notifications", icon: Bell, hasBadge: true },
   { href: "/it-staff/profile", label: "Profile", icon: User },

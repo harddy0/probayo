@@ -13,6 +13,7 @@ import {
   FileUp,
   Inbox,
   Loader,
+  Plus,
   RefreshCw,
   Search,
   TicketCheck,
@@ -41,16 +42,21 @@ import {
   fetchTicketById,
   fetchTickets,
   unassignTicket,
+  updateTicket,
   uploadCommentAttachment,
   uploadTicketAttachment,
 } from "@/lib/api/tickets";
+import { bulkAttachKnownIssue } from "@/lib/api/known-issues";
 import type {
   Ticket as TicketRecord,
   TicketAttachment,
   TicketPriority,
   TicketStatus,
 } from "@/lib/types/tickets";
+import type { KnownIssue } from "@/lib/types/known-issues";
 import { fetchAllUsers, type SimpleUser } from "@/lib/api/users";
+import CreateKnownIssueModal from "@/components/known-issues/create-known-issue-modal";
+import BatchAttachModal from "@/components/it-staff/batch-attach-modal";
 import { cn } from "@/lib/utils";
 
 // ── Constants ──
@@ -462,6 +468,33 @@ export default function AdminTicketsPage() {
   const [assignTicketId, setAssignTicketId] = useState<string | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
 
+  // ── Known Issue State ──
+  const [createKiTicketId, setCreateKiTicketId] = useState<string | null>(null);
+  const [singleAttachTicketId, setSingleAttachTicketId] = useState<string | null>(null);
+  const [isBatchAttachOpen, setIsBatchAttachOpen] = useState(false);
+
+  const handleCreatedKnownIssueAttach = async (issue: KnownIssue, ticketId: string) => {
+    try {
+      const updated = await updateTicket(ticketId, {
+        knownIssueId: issue.id,
+      });
+      push({ title: "Known issue attached", description: `${issue.title} linked to this ticket.`, variant: "success" });
+      setSelectedTicket(updated);
+      await loadTickets();
+    } catch (err) {
+      push({ title: "Failed", description: isApiError(err) ? err.message : "Could not attach known issue.", variant: "error" });
+    }
+  };
+
+  const handleBatchAttach = async (knownIssueId: string) => {
+    const ids = singleAttachTicketId ? [singleAttachTicketId] : [];
+    await bulkAttachKnownIssue({ ticketIds: ids, knownIssueId });
+    push({ title: "Attached", description: `${ids.length} ticket${ids.length !== 1 ? "s" : ""} linked to known issue.`, variant: "success" });
+    setSingleAttachTicketId(null);
+    if (selectedTicket) await loadTicketDetail(selectedTicket.id);
+    await loadTickets();
+  };
+
   // ── Comment State ──
   const [commentBody, setCommentBody] = useState("");
   const [commentFiles, setCommentFiles] = useState<FileList | null>(null);
@@ -603,7 +636,8 @@ export default function AdminTicketsPage() {
     setIsAssigning(true);
     try {
       await assignTicket(assignTicketId, userId);
-      push({ title: "Ticket assigned", description: "Ticket has been assigned to the selected IT staff member.", variant: "success" });
+      // When Admin assigns on an open ticket, the backend auto-acknowledges it
+      push({ title: "Ticket assigned", description: "Ticket assigned to IT staff. Open tickets are auto-acknowledged.", variant: "success" });
       setAssignTicketId(null);
       if (selectedTicket?.id === assignTicketId) {
         await loadTicketDetail(assignTicketId);
@@ -977,6 +1011,32 @@ export default function AdminTicketsPage() {
         loading={isAssigning}
       />
 
+      {/* ── Create Known Issue Modal ── */}
+      <CreateKnownIssueModal
+        open={createKiTicketId !== null}
+        onClose={() => setCreateKiTicketId(null)}
+        onCreated={(issue) => {
+          const ticketId = createKiTicketId;
+          setCreateKiTicketId(null);
+          if (ticketId) {
+            void handleCreatedKnownIssueAttach(issue, ticketId);
+          }
+        }}
+        initialTitle={selectedTicket?.title ?? ""}
+        initialDescription={selectedTicket?.description ?? ""}
+      />
+
+      {/* ── Batch Attach Modal ── */}
+      <BatchAttachModal
+        open={isBatchAttachOpen}
+        onClose={() => {
+          setIsBatchAttachOpen(false);
+          setSingleAttachTicketId(null);
+        }}
+        onAttach={handleBatchAttach}
+        selectedCount={singleAttachTicketId ? 1 : 0}
+      />
+
       {/* ── Ticket Detail Modal ── */}
       {isModalOpen && typeof window !== "undefined"
         ? createPortal(
@@ -1231,8 +1291,62 @@ export default function AdminTicketsPage() {
                               ) : null}
                             </div>
 
-                            {/* ── Right Column: Metadata Sidebar ── */}
+                            {/* ── Right Column: Known Issue + Metadata Sidebar ── */}
                             <div className="space-y-2.5">
+                              {/* Known Issue Section */}
+                              <div className="group relative overflow-hidden rounded-xl border border-amber-500/20 bg-gradient-to-br from-amber-500/[0.03] to-transparent p-3.5 transition-all duration-200 hover:border-amber-500/30">
+                                <div className="relative">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5">
+                                      <Bug className="h-3.5 w-3.5 text-amber-400" />
+                                      <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-amber-400/80">Known Issue</p>
+                                    </div>
+                                    {selectedTicket.knownIssueId ? (
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          try {
+                                            await updateTicket(selectedTicket.id, { knownIssueId: null });
+                                            push({ title: "Detached", description: "Known issue removed from ticket.", variant: "success" });
+                                            await loadTicketDetail(selectedTicket.id);
+                                          } catch (err) {
+                                            push({ title: "Failed", description: isApiError(err) ? err.message : "Could not detach.", variant: "error" });
+                                          }
+                                        }}
+                                        className="rounded-lg px-2.5 py-1 text-xs font-medium text-zinc-400 transition hover:bg-rose-500/10 hover:text-rose-300"
+                                      >
+                                        Detach
+                                      </button>
+                                    ) : (
+                                      <div className="flex items-center gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setSingleAttachTicketId(selectedTicket.id);
+                                            setIsBatchAttachOpen(true);
+                                          }}
+                                          className="rounded-lg px-2.5 py-1 text-xs font-medium text-amber-400 transition hover:bg-amber-500/10 hover:text-amber-300"
+                                        >
+                                          Attach
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setCreateKiTicketId(selectedTicket.id)}
+                                          className="rounded-lg px-2.5 py-1 text-xs font-medium text-emerald-400 transition hover:bg-emerald-500/10 hover:text-emerald-300"
+                                        >
+                                          <Plus className="mr-1 inline h-3 w-3" />
+                                          Create &amp; attach
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  {selectedTicket.knownIssueId ? (
+                                    <p className="mt-3 text-sm text-zinc-400">This ticket is linked to a known issue.</p>
+                                  ) : null}
+                                </div>
+                              </div>
+
+                              {/* Metadata Sidebar */}
                               <div className="flex items-center gap-1.5">
                                 <div className="flex h-4 w-4 items-center justify-center rounded-md bg-zinc-800">
                                   <svg className="h-2.5 w-2.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
