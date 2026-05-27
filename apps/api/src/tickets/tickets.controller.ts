@@ -103,7 +103,11 @@ export class TicketsController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update a ticket' })
+  @ApiOperation({
+    summary: 'Update a ticket',
+    description:
+      'Supports standard updates plus accept (acknowledge + self-assign) and optional known issue creation.',
+  })
   @ApiParam({ name: 'id', description: 'Ticket UUID' })
   @ApiBody({ type: UpdateTicketDto })
   @ApiResponse({

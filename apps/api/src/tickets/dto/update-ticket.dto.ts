@@ -1,12 +1,21 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
 import { CreateTicketDto } from './create-ticket.dto';
 import { TicketStatus } from '@prisma/client';
+import { CreateKnownIssueInlineDto } from './create-known-issue-inline.dto';
 
 export class UpdateTicketDto extends PartialType(CreateTicketDto) {
   @ApiPropertyOptional({
-    description: 'IT staff assigned to this ticket',
+    description:
+      'IT staff assigned to this ticket (admin assignment auto-acknowledges open tickets)',
     example: '123e4567-e89b-12d3-a456-426614174002',
     nullable: true,
   })
@@ -41,4 +50,22 @@ export class UpdateTicketDto extends PartialType(CreateTicketDto) {
   @IsUUID()
   @IsOptional()
   departmentId?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Accept the ticket (acknowledge and self-assign to the current IT staff)',
+    example: true,
+  })
+  @IsBoolean()
+  @IsOptional()
+  accept?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Create a known issue and attach it to this ticket',
+    type: CreateKnownIssueInlineDto,
+  })
+  @ValidateNested()
+  @Type(() => CreateKnownIssueInlineDto)
+  @IsOptional()
+  createKnownIssue?: CreateKnownIssueInlineDto;
 }
