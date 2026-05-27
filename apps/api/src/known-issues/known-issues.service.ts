@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { KnownIssueStatus } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TicketsService } from '../tickets/tickets.service';
 import { CreateAndAttachDto } from './dto/create-and-attach.dto';
 import { CreateKnownIssueDto } from './dto/create-known-issue.dto';
 import { UpdateKnownIssueDto } from './dto/update-known-issue.dto';
@@ -11,6 +12,7 @@ export class KnownIssuesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly ticketsService: TicketsService,
   ) {}
 
   async findAllActiveForDeflection() {
@@ -152,6 +154,11 @@ export class KnownIssuesService {
     });
 
     if (isResolving) {
+      await this.ticketsService.resolveTicketsForKnownIssue(
+        updatedIssue.id,
+        userId,
+      );
+
       void this.notificationsService.notifyKnownIssueResolved(
         updatedIssue.id,
         updatedIssue.title,

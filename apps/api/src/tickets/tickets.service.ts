@@ -297,9 +297,23 @@ export class TicketsService {
     }
 
     // 3. Prepare update data
-    const updateData: any = { ...updateTicketDto };
+    const { accept, createKnownIssue, departmentId, ...restUpdateDto } =
+      updateTicketDto;
 
-    const isAssigning = updateTicketDto.assignedToUserId !== undefined;
+    if (departmentId === null) {
+      throw new BadRequestException('Department cannot be cleared');
+    }
+
+    const updateData: Prisma.TicketUncheckedUpdateInput = { ...restUpdateDto };
+
+    if (departmentId !== undefined) {
+      updateData.departmentId = departmentId;
+    }
+
+    const isAccepting = accept === true;
+
+    const isAssigning =
+      restUpdateDto.assignedToUserId !== undefined || isAccepting;
     let assignedToUserForNotification: {
       id: string;
       email: string;
@@ -307,6 +321,76 @@ export class TicketsService {
       lastName: string | null;
       role: UserRole;
     } | null = null;
+
+    if (createKnownIssue && restUpdateDto.knownIssueId) {
+      throw new BadRequestException(
+        'Provide either knownIssueId or createKnownIssue, not both',
+      );
+    }
+
+    if (createKnownIssue) {
+      if (user.role !== UserRole.Admin && user.role !== UserRole.ItStaff) {
+        throw new ForbiddenException(
+          'Only admins and IT staff can create known issues',
+        );
+      }
+
+      const knownIssue = await this.prisma.knownIssue.create({
+        data: {
+          title: createKnownIssue.title,
+          description: createKnownIssue.description,
+          status: createKnownIssue.status ?? KnownIssueStatus.Active,
+          createdByUserId: userId,
+        },
+      });
+
+      updateData.knownIssueId = knownIssue.id;
+    }
+
+    if (isAccepting) {
+      if (user.role !== UserRole.ItStaff) {
+        throw new ForbiddenException('Only IT staff can accept tickets');
+      }
+
+      this.ensureTicketAssignable(existingTicket);
+
+      if (
+        existingTicket.assignedToUserId &&
+        existingTicket.assignedToUserId !== user.id
+      ) {
+        throw new BadRequestException(
+          'Ticket is already assigned to another staff member',
+        );
+      }
+
+      if (
+        restUpdateDto.assignedToUserId !== undefined &&
+        restUpdateDto.assignedToUserId !== user.id
+      ) {
+        throw new BadRequestException(
+          'Accepting a ticket assigns it to the current user',
+        );
+      }
+
+      const normalizedAcceptStatus = this.normalizeTicketStatus(
+        restUpdateDto.status,
+      );
+
+      if (
+        normalizedAcceptStatus &&
+        normalizedAcceptStatus !== TicketStatus.Acknowledged
+      ) {
+        throw new BadRequestException(
+          'Accepting a ticket sets status to acknowledged',
+        );
+      }
+
+      updateData.assignedToUserId = user.id;
+      updateData.status = TicketStatus.Acknowledged;
+    }
+
+    const assignedToUserIdCandidate =
+      restUpdateDto.assignedToUserId ?? (isAccepting ? user.id : undefined);
 
     if (isAssigning) {
       this.ensureTicketAssignable(existingTicket);
@@ -317,36 +401,46 @@ export class TicketsService {
         );
       }
 
-      if (updateTicketDto.assignedToUserId) {
+      if (assignedToUserIdCandidate) {
         if (
           user.role === UserRole.Admin &&
-          updateTicketDto.assignedToUserId === user.id
+          assignedToUserIdCandidate === user.id
         ) {
           throw new ForbiddenException('Admins cannot self-assign tickets');
         }
 
         if (
           user.role === UserRole.ItStaff &&
-          updateTicketDto.assignedToUserId !== user.id
+          assignedToUserIdCandidate !== user.id
         ) {
           throw new ForbiddenException('IT staff can only self-assign tickets');
         }
 
-        assignedToUserForNotification = await this.prisma.user.findUnique({
-          where: { id: updateTicketDto.assignedToUserId },
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-          },
-        });
+        if (assignedToUserIdCandidate === user.id) {
+          assignedToUserForNotification = {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role,
+          };
+        } else {
+          assignedToUserForNotification = await this.prisma.user.findUnique({
+            where: { id: assignedToUserIdCandidate },
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+            },
+          });
 
-        if (!assignedToUserForNotification) {
-          throw new NotFoundException(
-            `User ${updateTicketDto.assignedToUserId} not found`,
-          );
+          if (!assignedToUserForNotification) {
+            throw new NotFoundException(
+              `User ${assignedToUserIdCandidate} not found`,
+            );
+          }
         }
 
         if (assignedToUserForNotification.role !== UserRole.ItStaff) {
@@ -354,7 +448,7 @@ export class TicketsService {
             'Tickets can only be assigned to IT staff',
           );
         }
-      } else if (updateTicketDto.assignedToUserId === null) {
+      } else if (assignedToUserIdCandidate === null) {
         if (
           user.role === UserRole.ItStaff &&
           existingTicket.assignedToUserId !== user.id
@@ -364,17 +458,26 @@ export class TicketsService {
       }
     }
 
+    if (
+      user.role === UserRole.Admin &&
+      !isAccepting &&
+      assignedToUserIdCandidate &&
+      existingTicket.status === TicketStatus.Open &&
+      restUpdateDto.status === undefined
+    ) {
+      updateData.status = TicketStatus.Acknowledged;
+    }
+
     // 4. Handle status change
     let statusChanged = false;
     const oldStatus = existingTicket.status;
-    const newStatus = this.normalizeTicketStatus(updateTicketDto.status);
+    const newStatus = this.normalizeTicketStatus(updateData.status as string);
 
     if (updateTicketDto.status && !newStatus) {
       throw new BadRequestException('Invalid status value');
     }
 
     if (newStatus) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       updateData.status = newStatus;
     }
 
@@ -777,6 +880,76 @@ export class TicketsService {
     });
   }
 
+  // ==================== BULK RESOLVE FOR KNOWN ISSUE ====================
+  async resolveTicketsForKnownIssue(knownIssueId: string, actorUserId: string) {
+    const tickets = await this.prisma.ticket.findMany({
+      where: {
+        knownIssueId,
+        status: {
+          notIn: [TicketStatus.Resolved, TicketStatus.Closed],
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+        acknowledgedAt: true,
+        resolvedAt: true,
+        createdAt: true,
+        priority: true,
+        slaAckMinutes: true,
+        slaResolutionMinutes: true,
+        slaPausedAt: true,
+        totalPausedMinutes: true,
+      },
+    });
+
+    if (tickets.length === 0) {
+      return { updatedCount: 0 };
+    }
+
+    const now = new Date();
+
+    for (const ticket of tickets) {
+      const transitions = this.buildAutoResolveTransitions(ticket.status);
+      if (transitions.length === 0) {
+        continue;
+      }
+
+      await this.prisma.$transaction(async (tx) => {
+        const updateData: Prisma.TicketUpdateInput = {
+          status: TicketStatus.Resolved,
+          resolvedAt: ticket.resolvedAt ?? now,
+        };
+
+        if (
+          this.shouldSetAcknowledgedAt(ticket.status, ticket.acknowledgedAt)
+        ) {
+          updateData.acknowledgedAt = now;
+        }
+
+        await this.applySlaResumeForPendingUser(ticket, updateData);
+
+        await tx.ticket.update({
+          where: { id: ticket.id },
+          data: updateData,
+        });
+
+        for (const transition of transitions) {
+          await tx.ticketStatusHistory.create({
+            data: {
+              ticketId: ticket.id,
+              fromStatus: transition.from,
+              toStatus: transition.to,
+              changedByUserId: actorUserId,
+            },
+          });
+        }
+      });
+    }
+
+    return { updatedCount: tickets.length };
+  }
+
   // ==================== COMMENT METHODS (Proxy to CommentsModule) ====================
   // These methods are kept for backward compatibility
   // They delegate to the CommentsService but are maintained here for existing code
@@ -825,6 +998,98 @@ export class TicketsService {
         changedByUserId,
       },
     });
+  }
+
+  private buildAutoResolveTransitions(
+    currentStatus: TicketStatus,
+  ): Array<{ from: TicketStatus; to: TicketStatus }> {
+    switch (currentStatus) {
+      case TicketStatus.Open:
+        return [
+          { from: TicketStatus.Open, to: TicketStatus.Acknowledged },
+          {
+            from: TicketStatus.Acknowledged,
+            to: TicketStatus.InProgress,
+          },
+          { from: TicketStatus.InProgress, to: TicketStatus.Resolved },
+        ];
+      case TicketStatus.Acknowledged:
+        return [
+          {
+            from: TicketStatus.Acknowledged,
+            to: TicketStatus.InProgress,
+          },
+          { from: TicketStatus.InProgress, to: TicketStatus.Resolved },
+        ];
+      case TicketStatus.PendingUser:
+        return [
+          { from: TicketStatus.PendingUser, to: TicketStatus.InProgress },
+          { from: TicketStatus.InProgress, to: TicketStatus.Resolved },
+        ];
+      case TicketStatus.InProgress:
+        return [{ from: TicketStatus.InProgress, to: TicketStatus.Resolved }];
+      default:
+        return [];
+    }
+  }
+
+  private shouldSetAcknowledgedAt(
+    status: TicketStatus,
+    acknowledgedAt: Date | null,
+  ) {
+    if (acknowledgedAt) {
+      return false;
+    }
+
+    return status === TicketStatus.Open || status === TicketStatus.Acknowledged;
+  }
+
+  private async applySlaResumeForPendingUser(
+    ticket: {
+      status: TicketStatus;
+      slaPausedAt: Date | null;
+      totalPausedMinutes: number;
+      createdAt: Date;
+      priority: PriorityLevel;
+      slaAckMinutes: number | null;
+      slaResolutionMinutes: number | null;
+    },
+    updateData: Prisma.TicketUpdateInput,
+  ) {
+    if (ticket.status !== TicketStatus.PendingUser || !ticket.slaPausedAt) {
+      return;
+    }
+
+    const pausedMinutes = this.slaService.calculatePausedDuration(
+      ticket.slaPausedAt,
+    );
+    const newTotalPaused = ticket.totalPausedMinutes + pausedMinutes;
+
+    updateData.totalPausedMinutes = newTotalPaused;
+    updateData.slaPausedAt = null;
+
+    const snapshotMinutes = await this.slaService.resolveSnapshotMinutes(
+      ticket.priority,
+      ticket.slaAckMinutes,
+      ticket.slaResolutionMinutes,
+    );
+
+    const deadlines = this.slaService.calculateDeadlinesFromMinutes(
+      ticket.createdAt,
+      snapshotMinutes.acknowledgementMinutes,
+      snapshotMinutes.resolutionMinutes,
+      newTotalPaused,
+    );
+
+    if (ticket.slaAckMinutes == null) {
+      updateData.slaAckMinutes = snapshotMinutes.acknowledgementMinutes;
+    }
+    if (ticket.slaResolutionMinutes == null) {
+      updateData.slaResolutionMinutes = snapshotMinutes.resolutionMinutes;
+    }
+
+    updateData.slaAckDeadline = deadlines.ack;
+    updateData.slaResolutionDeadline = deadlines.resolution;
   }
   private validateStatusTransition(
     from: TicketStatus,

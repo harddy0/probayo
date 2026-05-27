@@ -102,7 +102,11 @@ export class KnownIssuesController {
   @Patch(':id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.Admin, UserRole.ItStaff)
-  @ApiOperation({ summary: 'Update a known issue' })
+  @ApiOperation({
+    summary: 'Update a known issue',
+    description:
+      'Resolving a known issue auto-resolves attached tickets (skips resolved/closed) and records full status history.',
+  })
   @ApiParam({ name: 'id', description: 'Known issue UUID' })
   @ApiBody({ type: UpdateKnownIssueDto })
   @ApiResponse({ status: 200, description: 'Known issue updated successfully' })
@@ -111,11 +115,7 @@ export class KnownIssuesController {
     @Request() req: { user: { id: string } },
     @Body() updateKnownIssueDto: UpdateKnownIssueDto,
   ) {
-    return this.knownIssuesService.update(
-      id,
-      req.user.id,
-      updateKnownIssueDto,
-    );
+    return this.knownIssuesService.update(id, req.user.id, updateKnownIssueDto);
   }
 
   @Delete(':id')

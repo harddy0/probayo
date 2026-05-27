@@ -8,7 +8,6 @@
  */
 
 import {
-  assignTicket,
   fetchTickets,
   unassignTicket,
   updateTicket,
@@ -73,26 +72,26 @@ export const fetchItStaffTickets = async (
 // ── Ticket Actions ──
 
 /**
- * Accept/claim a ticket — assigns the ticket to the specified IT staff member.
- * Returns the updated ticket.
+ * Accept/claim a ticket — assigns the ticket to the specified IT staff member
+ * and sets status to "Acknowledged" in a single API call.
+ * Uses the `accept` flag which forces self-assignment + acknowledgement.
  */
 export const acceptTicket = async (
   ticketId: string,
-  userId: string,
+  _userId: string,
 ): Promise<Ticket> => {
-  return assignTicket(ticketId, userId);
+  return updateTicket(ticketId, { accept: true });
 };
 
 /**
  * Claim a ticket and immediately set its status to "Acknowledged".
- * Useful as the primary "Accept" action so the ticket moves out of Open.
+ * Uses the `accept` flag which forces self-assignment + acknowledgement.
  */
 export const claimAndAcknowledge = async (
   ticketId: string,
-  userId: string,
+  _userId: string,
 ): Promise<Ticket> => {
-  await assignTicket(ticketId, userId);
-  return updateTicket(ticketId, { status: "Acknowledged" });
+  return updateTicket(ticketId, { accept: true });
 };
 
 /**

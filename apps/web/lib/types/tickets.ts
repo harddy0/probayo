@@ -157,6 +157,14 @@ export type UpdateTicketRequest = {
   categoryId?: string;
   departmentId?: string;
   knownIssueId?: string | null;
+  /** IT staff only: acknowledge + self-assign in one action */
+  accept?: boolean;
+  /** Create a known issue and attach it to this ticket. Mutually exclusive with knownIssueId. */
+  createKnownIssue?: {
+    title: string;
+    description: string;
+    status?: KnownIssueStatus;
+  };
 };
 
 export type TicketCommentCreateRequest = {
