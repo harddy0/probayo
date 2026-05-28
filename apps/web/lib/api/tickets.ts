@@ -32,6 +32,7 @@ export {
   fetchActiveKnownIssues,
   createKnownIssue,
   updateKnownIssue,
+  updateKnownIssueStatus,
   deleteKnownIssue,
   bulkAttachKnownIssue,
   createAndAttachKnownIssue,
@@ -146,24 +147,6 @@ export const fetchTicketsByKnownIssue = async (
   return fetchTickets({ knownIssueId });
 };
 
-/**
- * Resolve all tickets attached to a known issue by setting their status to "Resolved".
- */
-export const resolveTicketsUnderKnownIssue = async (
-  knownIssueId: string,
-): Promise<Ticket[]> => {
-  const tickets = await fetchTicketsByKnownIssue(knownIssueId);
-  const updated: Ticket[] = [];
-  for (const ticket of tickets) {
-    if (ticket.status !== "Resolved" && ticket.status !== "Closed") {
-      const result = await updateTicket(ticket.id, { status: "Resolved" });
-      updated.push(result);
-    } else {
-      updated.push(ticket);
-    }
-  }
-  return updated;
-};
 
 export const deleteTicket = async (id: string): Promise<void> => {
   await request<void>(`/tickets/${id}`, {
