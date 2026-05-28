@@ -23,6 +23,7 @@ import {
   Trash2,
   UserCheck,
   X,
+  ZoomIn,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -42,8 +43,6 @@ import {
   downloadAttachment,
   fetchAttachmentJobStatus,
   fetchTicketById,
-  fetchTicketsByKnownIssue,
-  resolveTicketsUnderKnownIssue,
   updateTicket,
   uploadCommentAttachment,
   uploadTicketAttachment,
@@ -52,6 +51,7 @@ import {
   bulkAttachKnownIssue,
   fetchActiveKnownIssues,
   fetchKnownIssues,
+  updateKnownIssueStatus,
 } from "@/lib/api/known-issues";
 import {
   claimAndAcknowledge,
@@ -69,6 +69,7 @@ import type { ItStaffTicketView } from "@/lib/types/it-staff";
 import StatusPipeline from "@/components/it-staff/status-pipeline";
 import BatchAttachModal from "@/components/it-staff/batch-attach-modal";
 import CreateKnownIssueModal from "@/components/known-issues/create-known-issue-modal";
+import ImageLightbox from "@/components/tickets/image-lightbox";
 import { cn } from "@/lib/utils";
 
 // ── Constants ──
@@ -272,7 +273,7 @@ function SlaTimer({ deadline, breached }: { deadline?: string | null; breached?:
 
 // ── Attachment Image ──
 
-function AttachmentImage({ attachment }: { attachment: TicketAttachment }) {
+function AttachmentImage({ attachment, onView }: { attachment: TicketAttachment; onView?: (src: string, name: string) => void }) {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -315,7 +316,22 @@ function AttachmentImage({ attachment }: { attachment: TicketAttachment }) {
   }
   if (url) {
     return (
-      <img src={url} alt={attachment.fileName} className="max-h-48 rounded-xl object-contain" />
+      <button
+        type="button"
+        className="group relative block w-full overflow-hidden rounded-lg"
+        onClick={() => onView?.(url, attachment.fileName)}
+      >
+        <img
+          src={url}
+          alt={attachment.fileName}
+          className="aspect-[4/3] w-full object-cover transition duration-200 group-hover:scale-105"
+        />
+        <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition duration-200 group-hover:bg-black/40">
+          <span className="scale-0 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm transition duration-200 group-hover:scale-100">
+            <ZoomIn className="h-4 w-4" />
+          </span>
+        </div>
+      </button>
     );
   }
   return null;
@@ -354,6 +370,10 @@ export default function ItStaffTicketsPage() {
   const [isResolvingAll, setIsResolvingAll] = useState(false);
   const [singleAttachTicketId, setSingleAttachTicketId] = useState<string | null>(null);
 
+  // ── Lightbox State ──
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [lightboxFileName, setLightboxFileName] = useState<string | undefined>();
+
   // ── Create Known Issue from Ticket State (uses shared modal) ──
   const [createKiTicketId, setCreateKiTicketId] = useState<string | null>(null);
 
@@ -389,8 +409,8 @@ export default function ItStaffTicketsPage() {
   const handleResolveAllUnderKnownIssue = async (knownIssueId: string) => {
     setIsResolvingAll(true);
     try {
-      const resolved = await resolveTicketsUnderKnownIssue(knownIssueId);
-      push({ title: "Resolved", description: `${resolved.length} ticket${resolved.length !== 1 ? "s" : ""} resolved.`, variant: "success" });
+      await updateKnownIssueStatus(knownIssueId, { status: "Resolved" });
+      push({ title: "Resolved", description: "All tickets under this known issue resolved.", variant: "success" });
       if (selectedTicket) {
         await loadTicketDetail(selectedTicket.id);
       }
@@ -1477,88 +1497,158 @@ export default function ItStaffTicketsPage() {
                         {/* ── Attachments Tab ── */}
                         {activeTab === "attachments" ? (
                           <div className="space-y-5">
-                            <div className="space-y-2">
-                              <Label htmlFor="ticket-attachments">Upload files</Label>
+                            {/* Upload Input */}
+                            <div className="group relative overflow-hidden rounded-xl border border-dashed border-white/15 bg-white/[0.02] p-5 transition-all hover:border-white/30 hover:bg-white/[0.04]">
                               <input
                                 id="ticket-attachments"
                                 ref={ticketFileInputRef}
                                 type="file"
                                 multiple
                                 accept={ACCEPTED_FILE_TYPES}
-                                onChange={(event) => void handleTicketFilesChange(event.target.files)}
-                                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
+                                onChange={(event) =>
+                                  void handleTicketFilesChange(event.target.files)
+                                }
+                                className="absolute inset-0 cursor-pointer opacity-0"
                               />
-                              <p className="text-xs text-zinc-500">
-                                Max 10MB per file. Images, PDF, docs, spreadsheets, text, and archives supported.
-                              </p>
+                              <div className="flex flex-col items-center gap-2">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5">
+                                  <FileUp className="h-5 w-5 text-zinc-400" />
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-sm font-medium text-zinc-300">Drop files or click to upload</p>
+                                  <p className="mt-0.5 text-xs text-zinc-500">
+                                    Max 10MB · Images, PDF, docs, spreadsheets &amp; text
+                                  </p>
+                                </div>
+                              </div>
                             </div>
 
+                            {/* Upload Queue */}
                             {uploadQueue.length > 0 ? (
-                              <div className="space-y-2">
-                                <p className="text-[10px] uppercase tracking-widest text-zinc-500">Uploads</p>
-                                {uploadQueue.map((item) => (                                  <div key={item.id}
-                                    className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300"
-                                  >
-                                    <span className="truncate">{item.fileName}</span>
-                                    <span className={cn(
-                                      "rounded-full px-2 py-0.5 text-[10px] uppercase",
-                                      item.status === "completed"
-                                        ? "bg-emerald-500/10 text-emerald-200"
-                                        : item.status === "failed"
-                                          ? "bg-rose-500/10 text-rose-200"
-                                          : "bg-white/10 text-zinc-200",
-                                    )}>
-                                      {item.status}
-                                    </span>
-                                  </div>
-                                ))}
+                              <div className="space-y-1.5">
+                                <p className="text-[10px] uppercase tracking-widest text-zinc-500">
+                                  Uploads
+                                </p>
+                                <div className="space-y-1.5">
+                                  {uploadQueue.map((item) => (
+                                    <div
+                                      key={item.id}
+                                      className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300"
+                                    >
+                                      <span className="truncate">{item.fileName}</span>
+                                      <span
+                                        className={cn(
+                                          "shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase",
+                                          item.status === "completed"
+                                            ? "bg-emerald-500/10 text-emerald-200"
+                                            : item.status === "failed"
+                                              ? "bg-rose-500/10 text-rose-200"
+                                              : "bg-white/10 text-zinc-200",
+                                        )}
+                                      >
+                                        {item.status}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             ) : null}
 
+                            {/* Attachment Grid */}
                             {ticketAttachments.length === 0 ? (
-                              <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-center text-sm text-zinc-500">
+                              <div className="rounded-xl border border-white/10 bg-white/5 p-10 text-center text-sm text-zinc-500">
                                 No attachments yet.
                               </div>
                             ) : (
-                              <div className="space-y-3">
-                                <p className="text-[10px] uppercase tracking-widest text-zinc-500">
-                                  {ticketAttachments.length} attachment{ticketAttachments.length !== 1 ? "s" : ""}
-                                </p>
-                                {ticketAttachments.map((attachment) => (
-                                  <div key={attachment.id} className="overflow-hidden rounded-lg border border-white/10 bg-white/5">
-                                    {attachment.fileType?.startsWith("image/") ? (
-                                      <div className="border-b border-white/10 bg-white/[0.02] p-3">
-                                        <AttachmentImage attachment={attachment} />
-                                      </div>
+                              <div className="space-y-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-1 w-1 rounded-full bg-zinc-500" />
+                                  <span className="text-[10px] uppercase tracking-widest text-zinc-500">
+                                    {ticketAttachments.filter((a) => a.fileType?.startsWith("image/")).length} image{ticketAttachments.filter((a) => a.fileType?.startsWith("image/")).length !== 1 ? "s" : ""}
+                                    {ticketAttachments.filter((a) => !a.fileType?.startsWith("image/")).length > 0 ? (
+                                      <> &middot; {ticketAttachments.filter((a) => !a.fileType?.startsWith("image/")).length} file{ticketAttachments.filter((a) => !a.fileType?.startsWith("image/")).length !== 1 ? "s" : ""}</>
                                     ) : null}
-                                    <div className="flex items-center justify-between px-4 py-3">
-                                      <div className="min-w-0">
-                                        <p className="truncate text-sm text-zinc-100">{attachment.fileName}</p>
-                                        <p className="text-xs text-zinc-500">
-                                          {formatFileSize(attachment.fileSizeBytes)} · {formatDateTime(attachment.createdAt)}
-                                        </p>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDownloadAttachment(attachment)}
-                                          className="rounded-full border border-white/10 p-2 text-zinc-300 transition hover:border-white/30 hover:text-white"
-                                        >
-                                          <Download className="h-4 w-4" />
-                                        </button>
-                                        {attachment.uploadedByUserId === currentUserId ? (
-                                          <button
-                                            type="button"
-                                            onClick={() => handleDeleteAttachment(attachment)}
-                                            className="rounded-full border border-rose-500/30 p-2 text-rose-300 transition hover:border-rose-400/60 hover:text-rose-100"
-                                          >
-                                            <Trash2 className="h-4 w-4" />
-                                          </button>
-                                        ) : null}
-                                      </div>
-                                    </div>
+                                  </span>
+                                </div>
+
+                                {/* Image Grid */}
+                                {ticketAttachments.filter((a) => a.fileType?.startsWith("image/")).length > 0 ? (
+                                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                                    {ticketAttachments
+                                      .filter((a) => a.fileType?.startsWith("image/"))
+                                      .map((attachment) => (
+                                        <div key={attachment.id} className="group relative overflow-hidden rounded-xl border border-white/10 bg-white/5">
+                                          <AttachmentImage
+                                            attachment={attachment}
+                                            onView={(src, name) => {
+                                              setLightboxSrc(src);
+                                              setLightboxFileName(name);
+                                            }}
+                                          />
+                                          <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                                            {attachment.uploadedByUserId === currentUserId ? (
+                                              <button
+                                                type="button"
+                                                onClick={() => handleDeleteAttachment(attachment)}
+                                                className="rounded-lg bg-black/60 p-1.5 text-rose-300 backdrop-blur-sm transition hover:bg-black/80 hover:text-rose-100"
+                                              >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                              </button>
+                                            ) : null}
+                                          </div>
+                                          <div className="border-t border-white/10 px-2 py-1.5">
+                                            <p className="truncate text-[10px] text-zinc-400">{attachment.fileName}</p>
+                                            <p className="truncate text-[9px] text-zinc-600">{formatFileSize(attachment.fileSizeBytes)}</p>
+                                          </div>
+                                        </div>
+                                      ))}
                                   </div>
-                                ))}
+                                ) : null}
+
+                                {/* Non-image Files */}
+                                {ticketAttachments.filter((a) => !a.fileType?.startsWith("image/")).length > 0 ? (
+                                  <div className="space-y-1.5">
+                                    <p className="text-[10px] uppercase tracking-widest text-zinc-500">Files</p>
+                                    {ticketAttachments
+                                      .filter((a) => !a.fileType?.startsWith("image/"))
+                                      .map((attachment) => (
+                                        <div
+                                          key={attachment.id}
+                                          className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 transition hover:border-white/20"
+                                        >
+                                          <div className="flex min-w-0 items-center gap-3">
+                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5">
+                                              <FileUp className="h-4 w-4 text-zinc-400" />
+                                            </div>
+                                            <div className="min-w-0">
+                                              <p className="truncate text-sm text-zinc-100">{attachment.fileName}</p>
+                                              <p className="text-xs text-zinc-500">
+                                                {formatFileSize(attachment.fileSizeBytes)} &middot; {formatDateTime(attachment.createdAt)}
+                                              </p>
+                                            </div>
+                                          </div>
+                                          <div className="flex shrink-0 items-center gap-1.5">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDownloadAttachment(attachment)}
+                                              className="rounded-lg border border-white/10 p-2 text-zinc-300 transition hover:border-white/30 hover:text-white"
+                                            >
+                                              <Download className="h-4 w-4" />
+                                            </button>
+                                            {attachment.uploadedByUserId === currentUserId ? (
+                                              <button
+                                                type="button"
+                                                onClick={() => handleDeleteAttachment(attachment)}
+                                                className="rounded-lg border border-rose-500/30 p-2 text-rose-300 transition hover:border-rose-400/60 hover:text-rose-100"
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                              </button>
+                                            ) : null}
+                                          </div>
+                                        </div>
+                                      ))}
+                                  </div>
+                                ) : null}
                               </div>
                             )}
                           </div>
@@ -1567,89 +1657,169 @@ export default function ItStaffTicketsPage() {
                         {/* ── Comments Tab ── */}
                         {activeTab === "comments" ? (
                           <div className="space-y-5">
-                            {selectedTicket.comments && selectedTicket.comments.length > 0 ? (
+                            {/* Comment List */}
+                            {selectedTicket.comments &&
+                            selectedTicket.comments.length > 0 ? (
                               <div className="space-y-3">
                                 <p className="text-[10px] uppercase tracking-widest text-zinc-500">
-                                  {selectedTicket.comments.length} comment{selectedTicket.comments.length !== 1 ? "s" : ""}
+                                  {selectedTicket.comments.length} comment
+                                  {selectedTicket.comments.length !== 1
+                                    ? "s"
+                                    : ""}
                                 </p>
-                                {selectedTicket.comments.map((comment) => (
-                                  <div key={comment.id} className="rounded-lg border border-white/10 bg-white/5 p-4">
-                                    <div className="flex items-center justify-between text-xs text-zinc-500">
-                                      <span className="font-medium text-zinc-300">
-                                        {formatUserName(comment.authorUser)}
-                                      </span>
-                                      <span>{formatDateTime(comment.createdAt)}</span>
-                                    </div>
-                                    <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-zinc-200">
-                                      {comment.body}
-                                    </p>
-                                    {comment.attachments && comment.attachments.length > 0 ? (
-                                      <div className="mt-3 space-y-2">
-                                        {comment.attachments.map((attachment) => (
-                                          <div key={attachment.id} className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
-                                            {attachment.fileType?.startsWith("image/") ? (
-                                              <div className="border-b border-white/10 bg-white/[0.02] p-2">
-                                                <AttachmentImage attachment={attachment} />
-                                              </div>
-                                            ) : null}
-                                            <div className="flex items-center justify-between px-3 py-2">
-                                              <div className="min-w-0">
-                                                <p className="truncate text-xs text-zinc-100">{attachment.fileName}</p>
-                                                <p className="text-[10px] text-zinc-500">
-                                                  {formatFileSize(attachment.fileSizeBytes)} · {formatDateTime(attachment.createdAt)}
-                                                </p>
-                                              </div>
-                                              <div className="flex items-center gap-1">
-                                                <button
-                                                  type="button"
-                                                  onClick={() => handleDownloadAttachment(attachment)}
-                                                  className="rounded-full border border-white/10 p-1.5 text-zinc-300 transition hover:border-white/30 hover:text-white"
-                                                >
-                                                  <Download className="h-3.5 w-3.5" />
-                                                </button>
-                                                {attachment.uploadedByUserId === currentUserId ? (
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => handleDeleteAttachment(attachment)}
-                                                    className="rounded-full border border-rose-500/30 p-1.5 text-rose-300 transition hover:border-rose-400/60 hover:text-rose-100"
-                                                  >
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                  </button>
-                                                ) : null}
-                                              </div>
-                                            </div>
+                                {selectedTicket.comments.map((comment, commentIdx) => {
+                                  const isCurrentUser = comment.authorUserId === currentUserId;
+                                  return (
+                                    <div
+                                      key={comment.id}
+                                      className={cn(
+                                        "group relative overflow-hidden rounded-xl border p-4 transition-all duration-200 hover:border-white/15",
+                                        isCurrentUser
+                                          ? "border-sky-500/20 bg-gradient-to-br from-sky-500/[0.04] to-transparent"
+                                          : "border-white/[0.06] bg-gradient-to-br from-white/[0.04] to-white/[0.01]",
+                                      )}
+                                    >
+                                      {/* Author Row */}
+                                      <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2.5">
+                                          <div className={cn(
+                                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold uppercase",
+                                            isCurrentUser
+                                              ? "bg-sky-500/20 text-sky-300"
+                                              : "bg-zinc-700/50 text-zinc-400",
+                                          )}>
+                                            {(comment.authorUser?.firstName?.[0] ?? comment.authorUser?.email?.[0] ?? "?")}
                                           </div>
-                                        ))}
+                                          <div>
+                                            <p className="text-sm font-medium text-zinc-100">
+                                              {formatUserName(comment.authorUser)}
+                                            </p>
+                                            <p className="text-[11px] text-zinc-500">
+                                              {formatDateTime(comment.createdAt)}
+                                            </p>
+                                          </div>
+                                        </div>
                                       </div>
-                                    ) : null}
-                                  </div>
-                                ))}
+
+                                      {/* Comment Body */}
+                                      <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-zinc-200">
+                                        {comment.body}
+                                      </p>
+
+                                      {/* Comment Attachments */}
+                                      {comment.attachments &&
+                                      comment.attachments.length > 0 ? (
+                                        <div className="mt-3 space-y-2">
+                                          {comment.attachments.map(
+                                            (attachment) => (
+                                              <div
+                                                key={attachment.id}
+                                                className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]"
+                                              >
+                                                {attachment.fileType?.startsWith(
+                                                  "image/",
+                                                ) ? (
+                                                  <div className="border-b border-white/10 bg-white/[0.02] p-2">
+                                                    <AttachmentImage
+                                                      attachment={attachment}
+                                                      onView={(src, name) => {
+                                                        setLightboxSrc(src);
+                                                        setLightboxFileName(name);
+                                                      }}
+                                                    />
+                                                  </div>
+                                                ) : null}
+                                                <div className="flex items-center justify-between px-3 py-2">
+                                                  <div className="min-w-0">
+                                                    <p className="truncate text-xs text-zinc-100">
+                                                      {attachment.fileName}
+                                                    </p>
+                                                    <p className="text-[10px] text-zinc-500">
+                                                      {formatFileSize(
+                                                        attachment.fileSizeBytes,
+                                                      )}{" "}
+                                                      {"\u00B7"}{" "}
+                                                      {formatDateTime(
+                                                        attachment.createdAt,
+                                                      )}
+                                                    </p>
+                                                  </div>
+                                                  <div className="flex items-center gap-1">
+                                                    <button
+                                                      type="button"
+                                                      onClick={() =>
+                                                        handleDownloadAttachment(
+                                                          attachment,
+                                                        )
+                                                      }
+                                                      className="rounded-full border border-white/10 p-1.5 text-zinc-300 transition hover:border-white/30 hover:text-white"
+                                                    >
+                                                      <Download className="h-3.5 w-3.5" />
+                                                    </button>
+                                                    {attachment.uploadedByUserId ===
+                                                    currentUserId ? (
+                                                      <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                          handleDeleteAttachment(
+                                                            attachment,
+                                                          )
+                                                        }
+                                                        className="rounded-full border border-rose-500/30 p-1.5 text-rose-300 transition hover:border-rose-400/60 hover:text-rose-100"
+                                                      >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                      </button>
+                                                    ) : null}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            ),
+                                          )}
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             ) : (
-                              <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-center text-sm text-zinc-500">
+                              <div className="rounded-xl border border-white/10 bg-white/5 p-10 text-center text-sm text-zinc-500">
                                 No comments yet.
                               </div>
                             )}
 
                             {/* Add Comment Form */}
-                            <div className="space-y-3 rounded-lg border border-white/10 bg-white/5 p-4">
-                              <Label>Add a comment</Label>
+                            <div className="space-y-3 rounded-xl border border-white/10 bg-gradient-to-br from-white/[0.04] to-transparent p-5">
+                              <div className="flex items-center gap-2">
+                                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-zinc-800">
+                                  <svg className="h-3 w-3 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                  </svg>
+                                </div>
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400">Add a comment</span>
+                              </div>
                               <Textarea
                                 value={commentBody}
-                                onChange={(event) => setCommentBody(event.target.value)}
+                                onChange={(event) =>
+                                  setCommentBody(event.target.value)
+                                }
                                 placeholder="Share an update on this ticket…"
                                 rows={3}
+                                className="rounded-lg text-sm"
                               />
                               <input
                                 ref={commentFileInputRef}
                                 type="file"
                                 multiple
                                 accept={ACCEPTED_FILE_TYPES}
-                                onChange={(event) => setCommentFiles(event.target.files)}
+                                onChange={(event) =>
+                                  setCommentFiles(event.target.files)
+                                }
                                 className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:border-white/20"
                               />
                               {commentError ? (
-                                <p className="text-sm text-rose-400">{commentError}</p>
+                                <p className="text-sm text-rose-400">
+                                  {commentError}
+                                </p>
                               ) : null}
                               <div className="flex justify-end">
                                 <Button
@@ -1702,6 +1872,16 @@ export default function ItStaffTicketsPage() {
         }}
         onAttach={handleBatchAttach}
         selectedCount={singleAttachTicketId ? 1 : selectedIds.size}
+      />
+
+      {/* Image Lightbox */}
+      <ImageLightbox
+        src={lightboxSrc}
+        fileName={lightboxFileName}
+        onClose={() => {
+          setLightboxSrc(null);
+          setLightboxFileName(undefined);
+        }}
       />
     </section>
   );
