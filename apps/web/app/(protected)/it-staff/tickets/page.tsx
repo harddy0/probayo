@@ -9,6 +9,8 @@ import {
   Bug,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Circle,
   Clock,
   Download,
@@ -59,6 +61,7 @@ import {
   releaseTicket,
 } from "@/lib/api/it-staff";
 import type {
+  PaginationMeta,
   Ticket as TicketRecord,
   TicketAttachment,
   TicketPriority,
@@ -76,17 +79,25 @@ import { cn } from "@/lib/utils";
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = [
-  "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp",
-  "application/pdf", "application/msword",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
+  "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "text/plain", "application/zip", "application/x-zip-compressed",
+  "text/plain",
+  "application/zip",
+  "application/x-zip-compressed",
   "application/x-rar-compressed",
 ];
 const ACCEPTED_FILE_TYPES = ALLOWED_MIME_TYPES.join(",");
 const UPLOAD_POLL_INTERVAL_MS = 1500;
 const UPLOAD_MAX_ATTEMPTS = 40;
+const PAGE_SIZE = 10;
 
 const statusLabels: Record<TicketStatus, string> = {
   Open: "Open",
@@ -120,7 +131,14 @@ const priorityStyles: Record<TicketPriority, string> = {
   Low: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
 };
 
-const STATUS_ORDER = ["Open", "Acknowledged", "PendingUser", "InProgress", "Resolved", "Closed"] as const;
+const STATUS_ORDER = [
+  "Open",
+  "Acknowledged",
+  "PendingUser",
+  "InProgress",
+  "Resolved",
+  "Closed",
+] as const;
 
 const PROG_COLORS = [
   "bg-emerald-500/50",
@@ -136,8 +154,6 @@ const getNextStatus = (current: TicketStatus): TicketStatus | null => {
   if (idx < 0 || idx >= STATUS_ORDER.length - 1) return null;
   return STATUS_ORDER[idx + 1] as TicketStatus;
 };
-
-
 
 type UploadStatus = "uploading" | "processing" | "completed" | "failed";
 
@@ -181,31 +197,41 @@ const formatFileSize = (bytes?: number | null) => {
     value /= 1024;
     index += 1;
   }
-  const formatted = value >= 10 || index === 0 ? value.toFixed(0) : value.toFixed(1);
+  const formatted =
+    value >= 10 || index === 0 ? value.toFixed(0) : value.toFixed(1);
   return `${formatted} ${units[index]}`;
 };
 
 const formatUserName = (
-  user?: { firstName?: string; lastName?: string; email?: string } | null,
+  user?: {
+    firstName?: string;
+    lastName?: string;
+    fullName?: string;
+    email?: string;
+  } | null,
 ) => {
   if (!user) return "—";
-  const name = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
+  const name =
+    user.fullName || `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
   return name || user.email || "—";
 };
 
 const validateFile = (file: File) => {
   if (file.size > MAX_FILE_SIZE_BYTES) return "File is larger than 10MB.";
-  if (file.type && !ALLOWED_MIME_TYPES.includes(file.type)) return "File type is not supported.";
+  if (file.type && !ALLOWED_MIME_TYPES.includes(file.type))
+    return "File type is not supported.";
   return null;
 };
 
-const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+const sleep = (ms: number) =>
+  new Promise((resolve) => window.setTimeout(resolve, ms));
 
 const pollAttachmentJob = async (jobId: string) => {
   for (let attempt = 0; attempt < UPLOAD_MAX_ATTEMPTS; attempt += 1) {
     const status = await fetchAttachmentJobStatus(jobId);
     if (status.state === "completed") return status;
-    if (status.state === "failed") throw new Error(status.failedReason || "Upload failed.");
+    if (status.state === "failed")
+      throw new Error(status.failedReason || "Upload failed.");
     await sleep(UPLOAD_POLL_INTERVAL_MS);
   }
   throw new Error("Upload timed out.");
@@ -213,15 +239,30 @@ const pollAttachmentJob = async (jobId: string) => {
 
 // ── Views ──
 
-const views: { id: ItStaffTicketView; label: string; icon: React.ReactNode }[] = [
-  { id: "unassigned", label: "Unassigned", icon: <Inbox className="h-4 w-4" /> },
-  { id: "my-tickets", label: "My tickets", icon: <UserCheck className="h-4 w-4" /> },
-  { id: "all", label: "All tickets", icon: <Circle className="h-4 w-4" /> },
-];
+const views: { id: ItStaffTicketView; label: string; icon: React.ReactNode }[] =
+  [
+    {
+      id: "unassigned",
+      label: "Unassigned",
+      icon: <Inbox className="h-4 w-4" />,
+    },
+    {
+      id: "my-tickets",
+      label: "My tickets",
+      icon: <UserCheck className="h-4 w-4" />,
+    },
+    { id: "all", label: "All tickets", icon: <Circle className="h-4 w-4" /> },
+  ];
 
 // ── SLA Timer ──
 
-function SlaTimer({ deadline, breached }: { deadline?: string | null; breached?: boolean | null }) {
+function SlaTimer({
+  deadline,
+  breached,
+}: {
+  deadline?: string | null;
+  breached?: boolean | null;
+}) {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -273,7 +314,13 @@ function SlaTimer({ deadline, breached }: { deadline?: string | null; breached?:
 
 // ── Attachment Image ──
 
-function AttachmentImage({ attachment, onView }: { attachment: TicketAttachment; onView?: (src: string, name: string) => void }) {
+function AttachmentImage({
+  attachment,
+  onView,
+}: {
+  attachment: TicketAttachment;
+  onView?: (src: string, name: string) => void;
+}) {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -348,10 +395,16 @@ export default function ItStaffTicketsPage() {
   // ── Data State ──
   const [tickets, setTickets] = useState<TicketRecord[]>([]);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
-  const [selectedTicket, setSelectedTicket] = useState<TicketRecord | null>(null);
+  const [selectedTicket, setSelectedTicket] = useState<TicketRecord | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [paginationMeta, setPaginationMeta] = useState<PaginationMeta | null>(
+    null,
+  );
   const [detailError, setDetailError] = useState<string | null>(null);
 
   // ── UI State ──
@@ -359,8 +412,10 @@ export default function ItStaffTicketsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("details");
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [filterPriority, setFilterPriority] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<TicketStatus | "all">("all");
+  const [filterPriority, setFilterPriority] = useState<TicketPriority | "all">(
+    "all",
+  );
   const [actionState, setActionState] = useState<ActionState | null>(null);
   const [statusMenuOpen, setStatusMenuOpen] = useState<string | null>(null);
 
@@ -368,11 +423,15 @@ export default function ItStaffTicketsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBatchAttachOpen, setIsBatchAttachOpen] = useState(false);
   const [isResolvingAll, setIsResolvingAll] = useState(false);
-  const [singleAttachTicketId, setSingleAttachTicketId] = useState<string | null>(null);
+  const [singleAttachTicketId, setSingleAttachTicketId] = useState<
+    string | null
+  >(null);
 
   // ── Lightbox State ──
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
-  const [lightboxFileName, setLightboxFileName] = useState<string | undefined>();
+  const [lightboxFileName, setLightboxFileName] = useState<
+    string | undefined
+  >();
 
   // ── Create Known Issue from Ticket State (uses shared modal) ──
   const [createKiTicketId, setCreateKiTicketId] = useState<string | null>(null);
@@ -397,9 +456,15 @@ export default function ItStaffTicketsPage() {
   const clearSelection = () => setSelectedIds(new Set());
 
   const handleBatchAttach = async (knownIssueId: string) => {
-    const ids = singleAttachTicketId ? [singleAttachTicketId] : Array.from(selectedIds);
+    const ids = singleAttachTicketId
+      ? [singleAttachTicketId]
+      : Array.from(selectedIds);
     await bulkAttachKnownIssue({ ticketIds: ids, knownIssueId });
-    push({ title: "Attached", description: `${ids.length} ticket${ids.length !== 1 ? "s" : ""} linked to known issue.`, variant: "success" });
+    push({
+      title: "Attached",
+      description: `${ids.length} ticket${ids.length !== 1 ? "s" : ""} linked to known issue.`,
+      variant: "success",
+    });
     setSingleAttachTicketId(null);
     clearSelection();
     if (selectedTicket) await loadTicketDetail(selectedTicket.id);
@@ -410,28 +475,51 @@ export default function ItStaffTicketsPage() {
     setIsResolvingAll(true);
     try {
       await updateKnownIssueStatus(knownIssueId, { status: "Resolved" });
-      push({ title: "Resolved", description: "All tickets under this known issue resolved.", variant: "success" });
+      push({
+        title: "Resolved",
+        description: "All tickets under this known issue resolved.",
+        variant: "success",
+      });
       if (selectedTicket) {
         await loadTicketDetail(selectedTicket.id);
       }
       await loadTickets();
     } catch (err) {
-      push({ title: "Failed", description: isApiError(err) ? err.message : "Could not resolve tickets.", variant: "error" });
+      push({
+        title: "Failed",
+        description: isApiError(err)
+          ? err.message
+          : "Could not resolve tickets.",
+        variant: "error",
+      });
     } finally {
       setIsResolvingAll(false);
     }
   };
 
-  const handleCreatedKnownIssueAttach = async (issue: KnownIssue, ticketId: string) => {
+  const handleCreatedKnownIssueAttach = async (
+    issue: KnownIssue,
+    ticketId: string,
+  ) => {
     try {
       const updated = await updateTicket(ticketId, {
         knownIssueId: issue.id,
       });
-      push({ title: "Known issue attached", description: `${issue.title} linked to this ticket.`, variant: "success" });
+      push({
+        title: "Known issue attached",
+        description: `${issue.title} linked to this ticket.`,
+        variant: "success",
+      });
       setSelectedTicket(updated);
       await loadTickets();
     } catch (err) {
-      push({ title: "Failed", description: isApiError(err) ? err.message : "Could not attach known issue.", variant: "error" });
+      push({
+        title: "Failed",
+        description: isApiError(err)
+          ? err.message
+          : "Could not attach known issue.",
+        variant: "error",
+      });
     }
   };
 
@@ -457,7 +545,10 @@ export default function ItStaffTicketsPage() {
   useEffect(() => {
     if (!statusMenuOpen) return;
     const handleClick = (e: MouseEvent) => {
-      if (statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) {
+      if (
+        statusMenuRef.current &&
+        !statusMenuRef.current.contains(e.target as Node)
+      ) {
         setStatusMenuOpen(null);
       }
     };
@@ -482,10 +573,14 @@ export default function ItStaffTicketsPage() {
 
     // Sort: critical/high first, then by created date descending
     const priorityOrder: Record<TicketPriority, number> = {
-      Critical: 0, High: 1, Medium: 2, Low: 3,
+      Critical: 0,
+      High: 1,
+      Medium: 2,
+      Low: 3,
     };
     result = [...result].sort((a, b) => {
-      const pDiff = (priorityOrder[a.priority] ?? 99) - (priorityOrder[b.priority] ?? 99);
+      const pDiff =
+        (priorityOrder[a.priority] ?? 99) - (priorityOrder[b.priority] ?? 99);
       if (pDiff !== 0) return pDiff;
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
@@ -494,18 +589,32 @@ export default function ItStaffTicketsPage() {
   }, [tickets, searchQuery, filterStatus, filterPriority]);
 
   // ── Load Functions ──
-  const loadTickets = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await fetchItStaffTickets(activeView, currentUserId ?? undefined);
-      setTickets(data);
-    } catch (err) {
-      setError(isApiError(err) ? err.message : "Failed to load tickets.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [activeView, currentUserId]);
+  const loadTickets = useCallback(
+    async (pageOverride?: number) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const page = pageOverride ?? currentPage;
+        const result = await fetchItStaffTickets(
+          activeView,
+          currentUserId ?? undefined,
+          {
+            page,
+            pageSize: PAGE_SIZE,
+            ...(filterStatus !== "all" ? { status: filterStatus } : {}),
+            ...(filterPriority !== "all" ? { priority: filterPriority } : {}),
+          },
+        );
+        setTickets(result.data);
+        setPaginationMeta(result.meta ?? null);
+      } catch (err) {
+        setError(isApiError(err) ? err.message : "Failed to load tickets.");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [activeView, currentUserId, currentPage, filterStatus, filterPriority],
+  );
 
   const loadTicketDetail = useCallback(async (ticketId: string) => {
     activeDetailRequestRef.current = ticketId;
@@ -566,7 +675,8 @@ export default function ItStaffTicketsPage() {
   // ── Handlers ──
 
   const handleRefresh = async () => {
-    await loadTickets();
+    setCurrentPage(1);
+    await loadTickets(1);
   };
 
   const handleRowClick = (ticketId: string) => {
@@ -599,13 +709,21 @@ export default function ItStaffTicketsPage() {
     setActionState({ type: "accept", ticketId, loading: true });
     try {
       await claimAndAcknowledge(ticketId, currentUserId);
-      push({ title: "Ticket accepted", description: "Ticket assigned and set to Acknowledged.", variant: "success" });
+      push({
+        title: "Ticket accepted",
+        description: "Ticket assigned and set to Acknowledged.",
+        variant: "success",
+      });
       if (selectedTicket?.id === ticketId) {
         await loadTicketDetail(ticketId);
       }
       await loadTickets();
     } catch (err) {
-      push({ title: "Failed", description: isApiError(err) ? err.message : "Could not accept ticket.", variant: "error" });
+      push({
+        title: "Failed",
+        description: isApiError(err) ? err.message : "Could not accept ticket.",
+        variant: "error",
+      });
     } finally {
       setActionState(null);
     }
@@ -615,20 +733,33 @@ export default function ItStaffTicketsPage() {
     setActionState({ type: "release", ticketId, loading: true });
     try {
       await releaseTicket(ticketId);
-      push({ title: "Ticket released", description: "The ticket is no longer assigned to you.", variant: "success" });
+      push({
+        title: "Ticket released",
+        description: "The ticket is no longer assigned to you.",
+        variant: "success",
+      });
       if (selectedTicket?.id === ticketId) {
         await loadTicketDetail(ticketId);
       }
       await loadTickets();
     } catch (err) {
-      push({ title: "Failed", description: isApiError(err) ? err.message : "Could not release ticket.", variant: "error" });
+      push({
+        title: "Failed",
+        description: isApiError(err)
+          ? err.message
+          : "Could not release ticket.",
+        variant: "error",
+      });
     } finally {
       setActionState(null);
     }
   };
 
   /** Validate that the transition follows the strict sequential order */
-  const isValidTransition = (current: TicketStatus, target: TicketStatus): boolean => {
+  const isValidTransition = (
+    current: TicketStatus,
+    target: TicketStatus,
+  ): boolean => {
     const currentIdx = STATUS_ORDER.indexOf(current);
     const targetIdx = STATUS_ORDER.indexOf(target);
     if (currentIdx < 0 || targetIdx < 0) return false;
@@ -636,9 +767,12 @@ export default function ItStaffTicketsPage() {
     return targetIdx === currentIdx + 1;
   };
 
-  const handleStatusChange = async (ticketId: string, newStatus: TicketStatus) => {
+  const handleStatusChange = async (
+    ticketId: string,
+    newStatus: TicketStatus,
+  ) => {
     // Find ticket from local state to validate transition (works for both modal & inline dropdown)
-    const currentTicket = tickets.find(t => t.id === ticketId);
+    const currentTicket = tickets.find((t) => t.id === ticketId);
     if (!currentTicket) return;
     if (!isValidTransition(currentTicket.status, newStatus)) {
       push({
@@ -652,13 +786,21 @@ export default function ItStaffTicketsPage() {
     setStatusMenuOpen(null);
     try {
       await updateTicket(ticketId, { status: newStatus });
-      push({ title: "Status updated", description: `Ticket set to ${statusLabels[newStatus]}.`, variant: "success" });
+      push({
+        title: "Status updated",
+        description: `Ticket set to ${statusLabels[newStatus]}.`,
+        variant: "success",
+      });
       if (selectedTicket?.id === ticketId) {
         await loadTicketDetail(ticketId);
       }
       await loadTickets();
     } catch (err) {
-      push({ title: "Failed", description: isApiError(err) ? err.message : "Could not update status.", variant: "error" });
+      push({
+        title: "Failed",
+        description: isApiError(err) ? err.message : "Could not update status.",
+        variant: "error",
+      });
     } finally {
       setActionState(null);
     }
@@ -684,7 +826,11 @@ export default function ItStaffTicketsPage() {
     const tasks = Array.from(files).map(async (file) => {
       const validationError = validateFile(file);
       if (validationError) {
-        push({ title: "Upload blocked", description: `${file.name}: ${validationError}`, variant: "error" });
+        push({
+          title: "Upload blocked",
+          description: `${file.name}: ${validationError}`,
+          variant: "error",
+        });
         return;
       }
       const uploadId = `${scope}-${Date.now()}-${file.name}`;
@@ -708,7 +854,9 @@ export default function ItStaffTicketsPage() {
 
   const handleTicketFilesChange = async (files: FileList | null) => {
     if (!files || !selectedTicket) return;
-    await uploadFiles(files, "ticket", (file) => uploadTicketAttachment(selectedTicket.id, file));
+    await uploadFiles(files, "ticket", (file) =>
+      uploadTicketAttachment(selectedTicket.id, file),
+    );
     await loadTicketDetail(selectedTicket.id);
     await loadTickets();
     if (ticketFileInputRef.current) ticketFileInputRef.current.value = "";
@@ -726,14 +874,20 @@ export default function ItStaffTicketsPage() {
     try {
       const created = await addTicketComment(selectedTicket.id, { body });
       if (commentFiles && commentFiles.length > 0) {
-        await uploadFiles(commentFiles, "comment", (file) => uploadCommentAttachment(created.id, file));
+        await uploadFiles(commentFiles, "comment", (file) =>
+          uploadCommentAttachment(created.id, file),
+        );
       }
       setCommentBody("");
       setCommentFiles(null);
       if (commentFileInputRef.current) commentFileInputRef.current.value = "";
       await loadTicketDetail(selectedTicket.id);
       await loadTickets();
-      push({ title: "Comment added", description: "Your update was shared on the ticket.", variant: "success" });
+      push({
+        title: "Comment added",
+        description: "Your update was shared on the ticket.",
+        variant: "success",
+      });
     } catch (err) {
       setCommentError(isApiError(err) ? err.message : "Failed to add comment.");
     } finally {
@@ -753,7 +907,9 @@ export default function ItStaffTicketsPage() {
     } catch (err) {
       push({
         title: "Download failed",
-        description: isApiError(err) ? err.message : "Unable to download the attachment.",
+        description: isApiError(err)
+          ? err.message
+          : "Unable to download the attachment.",
         variant: "error",
       });
     }
@@ -764,13 +920,19 @@ export default function ItStaffTicketsPage() {
     if (!confirm("Delete this attachment?")) return;
     try {
       await deleteAttachment(attachment.id);
-      push({ title: "Attachment deleted", description: "The file was removed successfully.", variant: "success" });
+      push({
+        title: "Attachment deleted",
+        description: "The file was removed successfully.",
+        variant: "success",
+      });
       await loadTicketDetail(selectedTicket.id);
       await loadTickets();
     } catch (err) {
       push({
         title: "Delete failed",
-        description: isApiError(err) ? err.message : "Unable to delete the attachment.",
+        description: isApiError(err)
+          ? err.message
+          : "Unable to delete the attachment.",
         variant: "error",
       });
     }
@@ -788,7 +950,9 @@ export default function ItStaffTicketsPage() {
           </div>
           <div>
             <h1 className="text-lg font-semibold text-white">Tickets</h1>
-            <p className="text-xs text-zinc-500">Manage incoming support requests</p>
+            <p className="text-xs text-zinc-500">
+              Manage incoming support requests
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -843,25 +1007,41 @@ export default function ItStaffTicketsPage() {
             className="h-10 w-full rounded-2xl border border-white/10 bg-white/5 pl-10 pr-4 text-sm text-zinc-50 outline-none transition placeholder:text-zinc-500 hover:border-white/20 focus:border-white/30 focus:ring-2 focus:ring-white/20"
           />
         </div>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
+        <Select
+          value={filterStatus}
+          onValueChange={(v) => {
+            setFilterStatus(v as TicketStatus | "all");
+            setCurrentPage(1);
+          }}
+        >
           <SelectTrigger className="w-40">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
             {Object.entries(statusLabels).map(([value, label]) => (
-              <SelectItem key={value} value={value}>{label}</SelectItem>
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={filterPriority} onValueChange={setFilterPriority}>
+        <Select
+          value={filterPriority}
+          onValueChange={(v) => {
+            setFilterPriority(v as TicketPriority | "all");
+            setCurrentPage(1);
+          }}
+        >
           <SelectTrigger className="w-40">
             <SelectValue placeholder="All priorities" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All priorities</SelectItem>
             {Object.entries(priorityLabels).map(([value, label]) => (
-              <SelectItem key={value} value={value}>{label}</SelectItem>
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -871,7 +1051,10 @@ export default function ItStaffTicketsPage() {
       {selectedIds.size > 0 ? (
         <div className="flex shrink-0 items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5">
           <span className="text-sm text-zinc-400">
-            <span className="font-medium text-zinc-200">{selectedIds.size}</span> selected
+            <span className="font-medium text-zinc-200">
+              {selectedIds.size}
+            </span>{" "}
+            selected
           </span>
           <div className="h-4 w-px bg-white/10" />
           <button
@@ -897,7 +1080,10 @@ export default function ItStaffTicketsPage() {
         {isLoading ? (
           <div className="divide-y divide-white/[0.06]">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex animate-pulse items-center gap-4 px-6 py-4">
+              <div
+                key={i}
+                className="flex animate-pulse items-center gap-4 px-6 py-4"
+              >
                 <div className="h-4 w-8 rounded bg-white/10" />
                 <div className="h-4 flex-1 rounded bg-white/10" />
                 <div className="h-4 w-20 rounded bg-white/10" />
@@ -927,7 +1113,9 @@ export default function ItStaffTicketsPage() {
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
               <Search className="h-5 w-5 text-zinc-500" />
             </div>
-            <p className="text-sm text-zinc-400">No tickets match your search criteria.</p>
+            <p className="text-sm text-zinc-400">
+              No tickets match your search criteria.
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -937,31 +1125,58 @@ export default function ItStaffTicketsPage() {
                   <th className="w-10 px-3 py-3.5 text-left">
                     <input
                       type="checkbox"
-                      checked={filteredTickets.length > 0 && selectedIds.size === filteredTickets.length}
+                      checked={
+                        filteredTickets.length > 0 &&
+                        selectedIds.size === filteredTickets.length
+                      }
                       onChange={selectAll}
                       className="rounded border-white/20 bg-white/5"
                     />
                   </th>
-                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">#</th>
-                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">Ticket</th>
-                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">Issue</th>
-                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">Priority</th>
-                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">Progression</th>
-                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">SLA</th>
-                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">Assignee</th>
-                  <th className="px-3 py-3.5 text-right text-[10px] font-medium uppercase tracking-widest text-zinc-500">Actions</th>
+                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    #
+                  </th>
+                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    Ticket
+                  </th>
+                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    Issue
+                  </th>
+                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    Priority
+                  </th>
+                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    Progression
+                  </th>
+                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    SLA
+                  </th>
+                  <th className="px-3 py-3.5 text-left text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    Assignee
+                  </th>
+                  <th className="px-3 py-3.5 text-right text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.06]">
                 {filteredTickets.map((ticket, index) => {
-                  const isActionLoading = actionState?.ticketId === ticket.id && actionState.loading;
-                  const isAssignedToMe = ticket.assignedToUserId === currentUserId;
-                  const isUnassigned = !ticket.assignedToUserId;
+                  const isActionLoading =
+                    actionState?.ticketId === ticket.id && actionState.loading;
+                  const isAssignedToMe =
+                    (ticket.assignedToUserId ?? ticket.assignedTo?.id) ===
+                    currentUserId;
+                  const isUnassigned =
+                    !ticket.assignedToUserId && !ticket.assignedTo?.id;
                   // Only show forward (next) status in inline dropdown
                   const nextForInline = getNextStatus(ticket.status);
-                  const availableStatuses = nextForInline ? [nextForInline] : [];
+                  const availableStatuses = nextForInline
+                    ? [nextForInline]
+                    : [];
 
-                  const currentIdx = STATUS_ORDER.indexOf(ticket.status as typeof STATUS_ORDER[number]);
+                  const currentIdx = STATUS_ORDER.indexOf(
+                    ticket.status as (typeof STATUS_ORDER)[number],
+                  );
 
                   return (
                     <tr
@@ -969,11 +1184,16 @@ export default function ItStaffTicketsPage() {
                       onClick={() => handleRowClick(ticket.id)}
                       className={cn(
                         "cursor-pointer transition-colors duration-150",
-                        selectedIds.has(ticket.id) ? "bg-white/[0.04]" : "hover:bg-white/5",
+                        selectedIds.has(ticket.id)
+                          ? "bg-white/[0.04]"
+                          : "hover:bg-white/5",
                       )}
                     >
                       {/* Checkbox */}
-                      <td className="w-10 px-3 py-4" onClick={(e) => e.stopPropagation()}>
+                      <td
+                        className="w-10 px-3 py-4"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <input
                           type="checkbox"
                           checked={selectedIds.has(ticket.id)}
@@ -987,10 +1207,16 @@ export default function ItStaffTicketsPage() {
                       <td className="max-w-[200px] px-3 py-4">
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
-                            <p className="truncate text-sm font-medium text-zinc-100">{ticket.title}</p>
+                            <p className="truncate text-sm font-medium text-zinc-100">
+                              {ticket.title}
+                            </p>
                           </div>
                           <p className="truncate text-xs text-zinc-500">
-                            {ticket.filedByUser ? formatUserName(ticket.filedByUser) : "—"}
+                            {(ticket.filedBy ?? ticket.filedByUser)
+                              ? formatUserName(
+                                  ticket.filedBy ?? ticket.filedByUser,
+                                )
+                              : "—"}
                           </p>
                         </div>
                       </td>
@@ -1007,10 +1233,12 @@ export default function ItStaffTicketsPage() {
                       </td>
                       {/* Priority */}
                       <td className="whitespace-nowrap px-3 py-4">
-                        <span className={cn(
-                          "inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider",
-                          priorityStyles[ticket.priority],
-                        )}>
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider",
+                            priorityStyles[ticket.priority],
+                          )}
+                        >
                           {priorityLabels[ticket.priority]}
                         </span>
                       </td>
@@ -1024,16 +1252,19 @@ export default function ItStaffTicketsPage() {
                                 className={cn(
                                   "h-1.5 w-1.5 rounded-full transition-all",
                                   i < currentIdx && PROG_COLORS[i],
-                                  i === currentIdx && "h-1.5 w-3 rounded-full bg-white",
+                                  i === currentIdx &&
+                                    "h-1.5 w-3 rounded-full bg-white",
                                   i > currentIdx && "bg-white/10",
                                 )}
                               />
                             ))}
                           </div>
-                          <span className={cn(
-                            "ml-1 inline-flex items-center rounded-full border px-1.5 py-0.5 text-[8px] font-medium uppercase tracking-wider",
-                            statusStyles[ticket.status],
-                          )}>
+                          <span
+                            className={cn(
+                              "ml-1 inline-flex items-center rounded-full border px-1.5 py-0.5 text-[8px] font-medium uppercase tracking-wider",
+                              statusStyles[ticket.status],
+                            )}
+                          >
                             {statusLabels[ticket.status]}
                           </span>
                         </div>
@@ -1045,19 +1276,28 @@ export default function ItStaffTicketsPage() {
                         />
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-400">
-                        {formatUserName(ticket.assignedToUser)}
+                        {formatUserName(
+                          ticket.assignedTo ?? ticket.assignedToUser,
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <div
+                          className="flex items-center justify-end gap-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           {ticket.status === "Closed" ? (
-                            <span className="text-[11px] text-zinc-600">Closed</span>
+                            <span className="text-[11px] text-zinc-600">
+                              Closed
+                            </span>
                           ) : (
                             <>
                               {/* Accept / Claim */}
                               {isUnassigned ? (
                                 <button
                                   type="button"
-                                  onClick={() => handleClaimAndAcknowledge(ticket.id)}
+                                  onClick={() =>
+                                    handleClaimAndAcknowledge(ticket.id)
+                                  }
                                   disabled={isActionLoading}
                                   className="inline-flex items-center gap-1 rounded-xl bg-white/10 px-3 py-1.5 text-[11px] font-medium text-zinc-200 transition hover:bg-white/20 disabled:opacity-50"
                                 >
@@ -1071,15 +1311,33 @@ export default function ItStaffTicketsPage() {
                               ) : null}
 
                               {/* Status dropdown (assigned tickets) */}
-                              {isAssignedToMe && availableStatuses.length > 0 ? (
-                                <div className="relative" ref={statusMenuOpen === ticket.id ? statusMenuRef : undefined}>
+                              {isAssignedToMe &&
+                              availableStatuses.length > 0 ? (
+                                <div
+                                  className="relative"
+                                  ref={
+                                    statusMenuOpen === ticket.id
+                                      ? statusMenuRef
+                                      : undefined
+                                  }
+                                >
                                   <button
                                     type="button"
-                                    onClick={() => setStatusMenuOpen(statusMenuOpen === ticket.id ? null : ticket.id)}
-                                    disabled={isActionLoading && actionState?.type === "status"}
+                                    onClick={() =>
+                                      setStatusMenuOpen(
+                                        statusMenuOpen === ticket.id
+                                          ? null
+                                          : ticket.id,
+                                      )
+                                    }
+                                    disabled={
+                                      isActionLoading &&
+                                      actionState?.type === "status"
+                                    }
                                     className="inline-flex items-center gap-1 rounded-xl bg-white/10 px-3 py-1.5 text-[11px] font-medium text-zinc-200 transition hover:bg-white/20 disabled:opacity-50"
                                   >
-                                    {isActionLoading && actionState?.type === "status" ? (
+                                    {isActionLoading &&
+                                    actionState?.type === "status" ? (
                                       <Loader className="h-3 w-3 animate-spin" />
                                     ) : (
                                       <ChevronDown className="h-3 w-3" />
@@ -1092,13 +1350,17 @@ export default function ItStaffTicketsPage() {
                                         <button
                                           key={s}
                                           type="button"
-                                          onClick={() => handleStatusChange(ticket.id, s)}
+                                          onClick={() =>
+                                            handleStatusChange(ticket.id, s)
+                                          }
                                           className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-zinc-300 transition hover:bg-white/5 hover:text-white"
                                         >
-                                          <span className={cn(
-                                            "inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wider",
-                                            statusStyles[s],
-                                          )}>
+                                          <span
+                                            className={cn(
+                                              "inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wider",
+                                              statusStyles[s],
+                                            )}
+                                          >
                                             {statusLabels[s]}
                                           </span>
                                         </button>
@@ -1113,10 +1375,14 @@ export default function ItStaffTicketsPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleReleaseTicket(ticket.id)}
-                                  disabled={isActionLoading && actionState?.type === "release"}
+                                  disabled={
+                                    isActionLoading &&
+                                    actionState?.type === "release"
+                                  }
                                   className="inline-flex items-center gap-1 rounded-xl border border-white/10 px-3 py-1.5 text-[11px] font-medium text-zinc-400 transition hover:border-rose-500/30 hover:text-rose-300 disabled:opacity-50"
                                 >
-                                  {isActionLoading && actionState?.type === "release" ? (
+                                  {isActionLoading &&
+                                  actionState?.type === "release" ? (
                                     <Loader className="h-3 w-3 animate-spin" />
                                   ) : (
                                     <LogOut className="h-3 w-3" />
@@ -1137,12 +1403,28 @@ export default function ItStaffTicketsPage() {
         )}
       </div>
 
+      {/* ── Pagination ── */}
+      {paginationMeta && filteredTickets.length > 0 ? (
+        <PaginationBar
+          currentPage={currentPage}
+          totalPages={paginationMeta.totalPages}
+          totalItems={paginationMeta.totalItems}
+          pageSize={PAGE_SIZE}
+          onPageChange={(page) => {
+            setCurrentPage(page);
+            void loadTickets(page);
+          }}
+        />
+      ) : null}
+
       {/* ── Ticket Detail Modal ── */}
       {isModalOpen && typeof window !== "undefined"
         ? createPortal(
             <div
               className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/80 backdrop-blur-xl"
-              onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) handleCloseModal();
+              }}
             >
               <div className="mx-4 my-6 w-full max-w-7xl sm:mx-auto">
                 <div className="flex max-h-[88vh] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-zinc-900/95 shadow-2xl backdrop-blur-xl">
@@ -1152,7 +1434,9 @@ export default function ItStaffTicketsPage() {
                       {isDetailLoading ? (
                         <div className="flex items-center gap-3">
                           <Loader className="h-5 w-5 animate-spin text-zinc-400" />
-                          <p className="text-sm text-zinc-400">Loading ticket details…</p>
+                          <p className="text-sm text-zinc-400">
+                            Loading ticket details…
+                          </p>
                         </div>
                       ) : detailError ? (
                         <div className="flex items-center gap-3">
@@ -1165,24 +1449,33 @@ export default function ItStaffTicketsPage() {
                             <h2 className="text-xl font-semibold tracking-tight text-white">
                               {selectedTicket.title}
                             </h2>
-                            <span className={cn(
-                              "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
-                              statusStyles[selectedTicket.status],
-                            )}>
+                            <span
+                              className={cn(
+                                "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
+                                statusStyles[selectedTicket.status],
+                              )}
+                            >
                               {statusLabels[selectedTicket.status]}
                             </span>
-                            <span className={cn(
-                              "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
-                              priorityStyles[selectedTicket.priority],
-                            )}>
+                            <span
+                              className={cn(
+                                "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
+                                priorityStyles[selectedTicket.priority],
+                              )}
+                            >
                               {priorityLabels[selectedTicket.priority]}
                             </span>
                           </div>
                           <div className="mt-1 flex items-center gap-3 text-xs text-zinc-500">
                             <span>ID: {selectedTicket.id}</span>
-                            {selectedTicket.assignedToUser ? (
+                            {(selectedTicket.assignedTo ??
+                            selectedTicket.assignedToUser) ? (
                               <span>
-                                Assigned to: {formatUserName(selectedTicket.assignedToUser)}
+                                Assigned to:{" "}
+                                {formatUserName(
+                                  selectedTicket.assignedTo ??
+                                    selectedTicket.assignedToUser,
+                                )}
                               </span>
                             ) : (
                               <span className="text-amber-400">Unassigned</span>
@@ -1198,37 +1491,53 @@ export default function ItStaffTicketsPage() {
                               </span>
                             ) : (
                               <>
-                                {!selectedTicket.assignedToUserId && currentUserId ? (
+                                {!(
+                                  selectedTicket.assignedToUserId ??
+                                  selectedTicket.assignedTo?.id
+                                ) && currentUserId ? (
                                   <Button
                                     className="h-8 text-xs"
                                     onClick={() => {
-                                      void handleClaimAndAcknowledge(selectedTicket.id);
+                                      void handleClaimAndAcknowledge(
+                                        selectedTicket.id,
+                                      );
                                     }}
                                   >
                                     <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
                                     Accept &amp; acknowledge
                                   </Button>
                                 ) : null}
-                                {selectedTicket.assignedToUserId === currentUserId ? (
+                                {(selectedTicket.assignedToUserId ??
+                                  selectedTicket.assignedTo?.id) ===
+                                currentUserId ? (
                                   <>
                                     {/* Current status badge */}
-                                    <span className={cn(
-                                      "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium",
-                                      statusStyles[selectedTicket.status],
-                                    )}>
+                                    <span
+                                      className={cn(
+                                        "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                                        statusStyles[selectedTicket.status],
+                                      )}
+                                    >
                                       {statusLabels[selectedTicket.status]}
                                     </span>
 
                                     {/* Advance to next sequential status */}
                                     {(() => {
-                                      const next = getNextStatus(selectedTicket.status);
+                                      const next = getNextStatus(
+                                        selectedTicket.status,
+                                      );
                                       if (!next) return null;
                                       return (
                                         <>
                                           <ArrowRight className="h-3.5 w-3.5 text-zinc-600" />
                                           <button
                                             type="button"
-                                            onClick={() => void handleStatusChange(selectedTicket.id, next)}
+                                            onClick={() =>
+                                              void handleStatusChange(
+                                                selectedTicket.id,
+                                                next,
+                                              )
+                                            }
                                             className={cn(
                                               "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all duration-150 hover:scale-105 active:scale-95",
                                               next === "PendingUser"
@@ -1251,7 +1560,11 @@ export default function ItStaffTicketsPage() {
                                     {/* Release button - ticket is not Closed in this branch */}
                                     <button
                                       type="button"
-                                      onClick={() => void handleReleaseTicket(selectedTicket.id)}
+                                      onClick={() =>
+                                        void handleReleaseTicket(
+                                          selectedTicket.id,
+                                        )
+                                      }
                                       className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/20 px-3 py-1.5 text-xs font-medium text-rose-300 transition hover:bg-rose-500/10"
                                     >
                                       <LogOut className="h-3.5 w-3.5" />
@@ -1276,11 +1589,11 @@ export default function ItStaffTicketsPage() {
 
                   {/* Tab Bar */}
                   <div className="flex gap-0 border-b border-white/[0.06] px-5">
-                    {([
+                    {[
                       { id: "details" as const, label: "Details" },
                       { id: "attachments" as const, label: "Attachments" },
                       { id: "comments" as const, label: "Comments" },
-                    ]).map((tab) => (
+                    ].map((tab) => (
                       <button
                         key={tab.id}
                         type="button"
@@ -1312,7 +1625,9 @@ export default function ItStaffTicketsPage() {
                         <p className="text-sm text-rose-200">{detailError}</p>
                       </div>
                     ) : !selectedTicket ? (
-                      <div className="py-12 text-center text-sm text-zinc-500">No ticket selected.</div>
+                      <div className="py-12 text-center text-sm text-zinc-500">
+                        No ticket selected.
+                      </div>
                     ) : (
                       <>
                         {/* ── Details Tab ── */}
@@ -1326,11 +1641,23 @@ export default function ItStaffTicketsPage() {
                                 <div className="relative">
                                   <div className="mb-2.5 flex items-center gap-2">
                                     <div className="flex h-4 w-4 items-center justify-center rounded-md bg-zinc-800">
-                                      <svg className="h-2.5 w-2.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16m-7 6h7" />
+                                      <svg
+                                        className="h-2.5 w-2.5 text-zinc-400"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={2}
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          d="M4 6h16M4 12h16m-7 6h7"
+                                        />
                                       </svg>
                                     </div>
-                                    <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400">Description</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400">
+                                      Description
+                                    </span>
                                   </div>
                                   <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-200">
                                     {selectedTicket.description}
@@ -1341,58 +1668,115 @@ export default function ItStaffTicketsPage() {
                               {/* Status Pipeline */}
                               <StatusPipeline
                                 currentStatus={selectedTicket.status}
-                                isStaff={selectedTicket.assignedToUserId === currentUserId}
+                                isStaff={
+                                  (selectedTicket.assignedToUserId ??
+                                    selectedTicket.assignedTo?.id) ===
+                                  currentUserId
+                                }
                                 onStatusClick={
-                                  selectedTicket.assignedToUserId === currentUserId
-                                    ? (s) => void handleStatusChange(selectedTicket.id, s)
+                                  (selectedTicket.assignedToUserId ??
+                                    selectedTicket.assignedTo?.id) ===
+                                  currentUserId
+                                    ? (s) =>
+                                        void handleStatusChange(
+                                          selectedTicket.id,
+                                          s,
+                                        )
                                     : undefined
                                 }
                               />
 
                               {/* Status History - Timeline */}
-                              {selectedTicket.statusHistory && selectedTicket.statusHistory.length > 0 ? (
+                              {selectedTicket.statusHistory &&
+                              selectedTicket.statusHistory.length > 0 ? (
                                 <div>
                                   <div className="mb-3 flex items-center gap-2">
                                     <div className="flex h-4 w-4 items-center justify-center rounded-md bg-zinc-800">
-                                      <svg className="h-2.5 w-2.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      <svg
+                                        className="h-2.5 w-2.5 text-zinc-400"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={2}
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                        />
                                       </svg>
                                     </div>
-                                    <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400">Status History</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400">
+                                      Status History
+                                    </span>
                                   </div>
                                   <div className="relative">
                                     <div className="absolute left-[11px] top-2 bottom-2 w-px bg-gradient-to-b from-white/20 via-white/10 to-transparent" />
                                     <div className="space-y-0">
-                                      {selectedTicket.statusHistory.map((entry, idx) => {
-                                        const isLatest = idx === selectedTicket.statusHistory!.length - 1;
-                                        return (
-                                          <div key={entry.id} className="relative flex gap-4 pb-5">
-                                            <div className={cn(
-                                              "relative z-10 mt-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2",
-                                              isLatest
-                                                ? "border-emerald-400 bg-emerald-500/20"
-                                                : "border-zinc-600 bg-zinc-800",
-                                            )}>
-                                              {isLatest ? (
-                                                <CheckCircle2 className="h-2.5 w-2.5 text-emerald-300" />
-                                              ) : (
-                                                <div className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
-                                              )}
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                              <div className="flex items-baseline justify-between gap-3">
-                                                <div className="flex items-center gap-1.5 text-sm">
-                                                  <span className="text-zinc-500">{entry.fromStatus ? statusLabels[entry.fromStatus] : "New"}</span>
-                                                  <span className="text-zinc-600">→</span>
-                                                  <span className="font-semibold text-zinc-100">{statusLabels[entry.toStatus]}</span>
-                                                </div>
-                                                <span className="shrink-0 text-[11px] text-zinc-500">{formatDateTime(entry.changedAt)}</span>
+                                      {selectedTicket.statusHistory.map(
+                                        (entry, idx) => {
+                                          const isLatest =
+                                            idx ===
+                                            selectedTicket.statusHistory!
+                                              .length -
+                                              1;
+                                          return (
+                                            <div
+                                              key={entry.id}
+                                              className="relative flex gap-4 pb-5"
+                                            >
+                                              <div
+                                                className={cn(
+                                                  "relative z-10 mt-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2",
+                                                  isLatest
+                                                    ? "border-emerald-400 bg-emerald-500/20"
+                                                    : "border-zinc-600 bg-zinc-800",
+                                                )}
+                                              >
+                                                {isLatest ? (
+                                                  <CheckCircle2 className="h-2.5 w-2.5 text-emerald-300" />
+                                                ) : (
+                                                  <div className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
+                                                )}
                                               </div>
-                                              <p className="mt-0.5 text-[11px] text-zinc-500">by {formatUserName(entry.changedByUser)}</p>
+                                              <div className="min-w-0 flex-1">
+                                                <div className="flex items-baseline justify-between gap-3">
+                                                  <div className="flex items-center gap-1.5 text-sm">
+                                                    <span className="text-zinc-500">
+                                                      {entry.fromStatus
+                                                        ? statusLabels[
+                                                            entry.fromStatus
+                                                          ]
+                                                        : "New"}
+                                                    </span>
+                                                    <span className="text-zinc-600">
+                                                      →
+                                                    </span>
+                                                    <span className="font-semibold text-zinc-100">
+                                                      {
+                                                        statusLabels[
+                                                          entry.toStatus
+                                                        ]
+                                                      }
+                                                    </span>
+                                                  </div>
+                                                  <span className="shrink-0 text-[11px] text-zinc-500">
+                                                    {formatDateTime(
+                                                      entry.changedAt,
+                                                    )}
+                                                  </span>
+                                                </div>
+                                                <p className="mt-0.5 text-[11px] text-zinc-500">
+                                                  by{" "}
+                                                  {formatUserName(
+                                                    entry.changedByUser,
+                                                  )}
+                                                </p>
+                                              </div>
                                             </div>
-                                          </div>
-                                        );
-                                      })}
+                                          );
+                                        },
+                                      )}
                                     </div>
                                   </div>
                                 </div>
@@ -1407,18 +1791,36 @@ export default function ItStaffTicketsPage() {
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-1.5">
                                       <Bug className="h-3.5 w-3.5 text-amber-400" />
-                                      <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-amber-400/80">Known Issue</p>
+                                      <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-amber-400/80">
+                                        Known Issue
+                                      </p>
                                     </div>
                                     {selectedTicket.knownIssueId ? (
                                       <button
                                         type="button"
                                         onClick={async () => {
                                           try {
-                                            await updateTicket(selectedTicket.id, { knownIssueId: null });
-                                            push({ title: "Detached", description: "Known issue removed from ticket.", variant: "success" });
-                                            await loadTicketDetail(selectedTicket.id);
+                                            await updateTicket(
+                                              selectedTicket.id,
+                                              { knownIssueId: null },
+                                            );
+                                            push({
+                                              title: "Detached",
+                                              description:
+                                                "Known issue removed from ticket.",
+                                              variant: "success",
+                                            });
+                                            await loadTicketDetail(
+                                              selectedTicket.id,
+                                            );
                                           } catch (err) {
-                                            push({ title: "Failed", description: isApiError(err) ? err.message : "Could not detach.", variant: "error" });
+                                            push({
+                                              title: "Failed",
+                                              description: isApiError(err)
+                                                ? err.message
+                                                : "Could not detach.",
+                                              variant: "error",
+                                            });
                                           }
                                         }}
                                         className="rounded-lg px-2.5 py-1 text-xs font-medium text-zinc-400 transition hover:bg-rose-500/10 hover:text-rose-300"
@@ -1430,7 +1832,9 @@ export default function ItStaffTicketsPage() {
                                         <button
                                           type="button"
                                           onClick={() => {
-                                            setSingleAttachTicketId(selectedTicket.id);
+                                            setSingleAttachTicketId(
+                                              selectedTicket.id,
+                                            );
                                             setIsBatchAttachOpen(true);
                                           }}
                                           className="rounded-lg px-2.5 py-1 text-xs font-medium text-amber-400 transition hover:bg-amber-500/10 hover:text-amber-300"
@@ -1439,7 +1843,11 @@ export default function ItStaffTicketsPage() {
                                         </button>
                                         <button
                                           type="button"
-                                          onClick={() => setCreateKiTicketId(selectedTicket.id)}
+                                          onClick={() =>
+                                            setCreateKiTicketId(
+                                              selectedTicket.id,
+                                            )
+                                          }
                                           className="rounded-lg px-2.5 py-1 text-xs font-medium text-emerald-400 transition hover:bg-emerald-500/10 hover:text-emerald-300"
                                         >
                                           <Plus className="mr-1 inline h-3 w-3" />
@@ -1450,14 +1858,24 @@ export default function ItStaffTicketsPage() {
                                   </div>
                                   {selectedTicket.knownIssueId ? (
                                     <div className="mt-3">
-                                      <p className="text-sm text-zinc-400">This ticket is linked to a known issue.</p>
+                                      <p className="text-sm text-zinc-400">
+                                        This ticket is linked to a known issue.
+                                      </p>
                                       <button
                                         type="button"
-                                        onClick={() => void handleResolveAllUnderKnownIssue(selectedTicket.knownIssueId!)}
+                                        onClick={() =>
+                                          void handleResolveAllUnderKnownIssue(
+                                            selectedTicket.knownIssueId!,
+                                          )
+                                        }
                                         disabled={isResolvingAll}
                                         className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-200 transition hover:bg-emerald-500/30 disabled:opacity-50"
                                       >
-                                        {isResolvingAll ? <Loader className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                                        {isResolvingAll ? (
+                                          <Loader className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                          <CheckCircle2 className="h-3.5 w-3.5" />
+                                        )}
                                         Resolve all
                                       </button>
                                     </div>
@@ -1469,25 +1887,113 @@ export default function ItStaffTicketsPage() {
                               <div>
                                 <div className="mb-2.5 flex items-center gap-1.5">
                                   <div className="flex h-4 w-4 items-center justify-center rounded-md bg-zinc-800">
-                                    <svg className="h-2.5 w-2.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    <svg
+                                      className="h-2.5 w-2.5 text-zinc-400"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                      />
                                     </svg>
                                   </div>
-                                  <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-500">Ticket Details</span>
+                                  <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-500">
+                                    Ticket Details
+                                  </span>
                                 </div>
                                 <div className="space-y-1.5">
-                                  <ModernMetadataItem icon="folder" label="Category" value={selectedTicket.category?.name || "—"} />
-                                  <ModernMetadataItem icon="monitor" label="Asset" value={selectedTicket.asset?.deviceType || "—"} />
-                                  <ModernMetadataItem icon="user" label="Requested by" value={formatUserName(selectedTicket.filedByUser)} />
-                                  <ModernMetadataItem icon="building" label="Department" value={selectedTicket.department?.name || "—"} />
-                                  <ModernMetadataItem icon="target" label="Assigned to" value={formatUserName(selectedTicket.assignedToUser)} />
-                                  <ModernMetadataItem icon="calendar" label="Created" value={formatDateTime(selectedTicket.createdAt)} />
-                                  <ModernMetadataItem icon="calendar" label="Updated" value={formatDateTime(selectedTicket.updatedAt)} />
-                                  <ModernMetadataItem icon="check" label="Acknowledged" value={formatDateTime(selectedTicket.acknowledgedAt)} />
-                                  <ModernMetadataItem icon="clock" label="SLA Acknowledge" value={formatDateTime(selectedTicket.slaAckDeadline)} />
-                                  <ModernMetadataItem icon="clock" label="SLA Resolution" value={formatDateTime(selectedTicket.slaResolutionDeadline)} />
-                                  <ModernMetadataItem icon="alert" label="SLA Ack Breached" value={selectedTicket.slaAckBreached ? "Yes" : "No"} />
-                                  <ModernMetadataItem icon="alert" label="SLA Resolution Breached" value={selectedTicket.slaResolutionBreached ? "Yes" : "No"} />
+                                  <ModernMetadataItem
+                                    icon="folder"
+                                    label="Category"
+                                    value={selectedTicket.category?.name || "—"}
+                                  />
+                                  <ModernMetadataItem
+                                    icon="monitor"
+                                    label="Asset"
+                                    value={
+                                      selectedTicket.asset?.deviceType || "—"
+                                    }
+                                  />
+                                  <ModernMetadataItem
+                                    icon="user"
+                                    label="Requested by"
+                                    value={formatUserName(
+                                      selectedTicket.filedBy ??
+                                        selectedTicket.filedByUser,
+                                    )}
+                                  />
+                                  <ModernMetadataItem
+                                    icon="building"
+                                    label="Department"
+                                    value={
+                                      selectedTicket.department?.name || "—"
+                                    }
+                                  />
+                                  <ModernMetadataItem
+                                    icon="target"
+                                    label="Assigned to"
+                                    value={formatUserName(
+                                      selectedTicket.assignedTo ??
+                                        selectedTicket.assignedToUser,
+                                    )}
+                                  />
+                                  <ModernMetadataItem
+                                    icon="calendar"
+                                    label="Created"
+                                    value={formatDateTime(
+                                      selectedTicket.createdAt,
+                                    )}
+                                  />
+                                  <ModernMetadataItem
+                                    icon="calendar"
+                                    label="Updated"
+                                    value={formatDateTime(
+                                      selectedTicket.updatedAt,
+                                    )}
+                                  />
+                                  <ModernMetadataItem
+                                    icon="check"
+                                    label="Acknowledged"
+                                    value={formatDateTime(
+                                      selectedTicket.acknowledgedAt,
+                                    )}
+                                  />
+                                  <ModernMetadataItem
+                                    icon="clock"
+                                    label="SLA Acknowledge"
+                                    value={formatDateTime(
+                                      selectedTicket.slaAckDeadline,
+                                    )}
+                                  />
+                                  <ModernMetadataItem
+                                    icon="clock"
+                                    label="SLA Resolution"
+                                    value={formatDateTime(
+                                      selectedTicket.slaResolutionDeadline,
+                                    )}
+                                  />
+                                  <ModernMetadataItem
+                                    icon="alert"
+                                    label="SLA Ack Breached"
+                                    value={
+                                      selectedTicket.slaAckBreached
+                                        ? "Yes"
+                                        : "No"
+                                    }
+                                  />
+                                  <ModernMetadataItem
+                                    icon="alert"
+                                    label="SLA Resolution Breached"
+                                    value={
+                                      selectedTicket.slaResolutionBreached
+                                        ? "Yes"
+                                        : "No"
+                                    }
+                                  />
                                 </div>
                               </div>
                             </div>
@@ -1506,7 +2012,9 @@ export default function ItStaffTicketsPage() {
                                 multiple
                                 accept={ACCEPTED_FILE_TYPES}
                                 onChange={(event) =>
-                                  void handleTicketFilesChange(event.target.files)
+                                  void handleTicketFilesChange(
+                                    event.target.files,
+                                  )
                                 }
                                 className="absolute inset-0 cursor-pointer opacity-0"
                               />
@@ -1515,9 +2023,12 @@ export default function ItStaffTicketsPage() {
                                   <FileUp className="h-5 w-5 text-zinc-400" />
                                 </div>
                                 <div className="text-center">
-                                  <p className="text-sm font-medium text-zinc-300">Drop files or click to upload</p>
+                                  <p className="text-sm font-medium text-zinc-300">
+                                    Drop files or click to upload
+                                  </p>
                                   <p className="mt-0.5 text-xs text-zinc-500">
-                                    Max 10MB · Images, PDF, docs, spreadsheets &amp; text
+                                    Max 10MB · Images, PDF, docs, spreadsheets
+                                    &amp; text
                                   </p>
                                 </div>
                               </div>
@@ -1535,7 +2046,9 @@ export default function ItStaffTicketsPage() {
                                       key={item.id}
                                       className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300"
                                     >
-                                      <span className="truncate">{item.fileName}</span>
+                                      <span className="truncate">
+                                        {item.fileName}
+                                      </span>
                                       <span
                                         className={cn(
                                           "shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase",
@@ -1564,20 +2077,55 @@ export default function ItStaffTicketsPage() {
                                 <div className="flex items-center gap-2">
                                   <div className="h-1 w-1 rounded-full bg-zinc-500" />
                                   <span className="text-[10px] uppercase tracking-widest text-zinc-500">
-                                    {ticketAttachments.filter((a) => a.fileType?.startsWith("image/")).length} image{ticketAttachments.filter((a) => a.fileType?.startsWith("image/")).length !== 1 ? "s" : ""}
-                                    {ticketAttachments.filter((a) => !a.fileType?.startsWith("image/")).length > 0 ? (
-                                      <> &middot; {ticketAttachments.filter((a) => !a.fileType?.startsWith("image/")).length} file{ticketAttachments.filter((a) => !a.fileType?.startsWith("image/")).length !== 1 ? "s" : ""}</>
+                                    {
+                                      ticketAttachments.filter((a) =>
+                                        a.fileType?.startsWith("image/"),
+                                      ).length
+                                    }{" "}
+                                    image
+                                    {ticketAttachments.filter((a) =>
+                                      a.fileType?.startsWith("image/"),
+                                    ).length !== 1
+                                      ? "s"
+                                      : ""}
+                                    {ticketAttachments.filter(
+                                      (a) => !a.fileType?.startsWith("image/"),
+                                    ).length > 0 ? (
+                                      <>
+                                        {" "}
+                                        &middot;{" "}
+                                        {
+                                          ticketAttachments.filter(
+                                            (a) =>
+                                              !a.fileType?.startsWith("image/"),
+                                          ).length
+                                        }{" "}
+                                        file
+                                        {ticketAttachments.filter(
+                                          (a) =>
+                                            !a.fileType?.startsWith("image/"),
+                                        ).length !== 1
+                                          ? "s"
+                                          : ""}
+                                      </>
                                     ) : null}
                                   </span>
                                 </div>
 
                                 {/* Image Grid */}
-                                {ticketAttachments.filter((a) => a.fileType?.startsWith("image/")).length > 0 ? (
+                                {ticketAttachments.filter((a) =>
+                                  a.fileType?.startsWith("image/"),
+                                ).length > 0 ? (
                                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                                     {ticketAttachments
-                                      .filter((a) => a.fileType?.startsWith("image/"))
+                                      .filter((a) =>
+                                        a.fileType?.startsWith("image/"),
+                                      )
                                       .map((attachment) => (
-                                        <div key={attachment.id} className="group relative overflow-hidden rounded-xl border border-white/10 bg-white/5">
+                                        <div
+                                          key={attachment.id}
+                                          className="group relative overflow-hidden rounded-xl border border-white/10 bg-white/5"
+                                        >
                                           <AttachmentImage
                                             attachment={attachment}
                                             onView={(src, name) => {
@@ -1586,10 +2134,15 @@ export default function ItStaffTicketsPage() {
                                             }}
                                           />
                                           <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                                            {attachment.uploadedByUserId === currentUserId ? (
+                                            {attachment.uploadedByUserId ===
+                                            currentUserId ? (
                                               <button
                                                 type="button"
-                                                onClick={() => handleDeleteAttachment(attachment)}
+                                                onClick={() =>
+                                                  handleDeleteAttachment(
+                                                    attachment,
+                                                  )
+                                                }
                                                 className="rounded-lg bg-black/60 p-1.5 text-rose-300 backdrop-blur-sm transition hover:bg-black/80 hover:text-rose-100"
                                               >
                                                 <Trash2 className="h-3.5 w-3.5" />
@@ -1597,8 +2150,14 @@ export default function ItStaffTicketsPage() {
                                             ) : null}
                                           </div>
                                           <div className="border-t border-white/10 px-2 py-1.5">
-                                            <p className="truncate text-[10px] text-zinc-400">{attachment.fileName}</p>
-                                            <p className="truncate text-[9px] text-zinc-600">{formatFileSize(attachment.fileSizeBytes)}</p>
+                                            <p className="truncate text-[10px] text-zinc-400">
+                                              {attachment.fileName}
+                                            </p>
+                                            <p className="truncate text-[9px] text-zinc-600">
+                                              {formatFileSize(
+                                                attachment.fileSizeBytes,
+                                              )}
+                                            </p>
                                           </div>
                                         </div>
                                       ))}
@@ -1606,11 +2165,18 @@ export default function ItStaffTicketsPage() {
                                 ) : null}
 
                                 {/* Non-image Files */}
-                                {ticketAttachments.filter((a) => !a.fileType?.startsWith("image/")).length > 0 ? (
+                                {ticketAttachments.filter(
+                                  (a) => !a.fileType?.startsWith("image/"),
+                                ).length > 0 ? (
                                   <div className="space-y-1.5">
-                                    <p className="text-[10px] uppercase tracking-widest text-zinc-500">Files</p>
+                                    <p className="text-[10px] uppercase tracking-widest text-zinc-500">
+                                      Files
+                                    </p>
                                     {ticketAttachments
-                                      .filter((a) => !a.fileType?.startsWith("image/"))
+                                      .filter(
+                                        (a) =>
+                                          !a.fileType?.startsWith("image/"),
+                                      )
                                       .map((attachment) => (
                                         <div
                                           key={attachment.id}
@@ -1621,24 +2187,41 @@ export default function ItStaffTicketsPage() {
                                               <FileUp className="h-4 w-4 text-zinc-400" />
                                             </div>
                                             <div className="min-w-0">
-                                              <p className="truncate text-sm text-zinc-100">{attachment.fileName}</p>
+                                              <p className="truncate text-sm text-zinc-100">
+                                                {attachment.fileName}
+                                              </p>
                                               <p className="text-xs text-zinc-500">
-                                                {formatFileSize(attachment.fileSizeBytes)} &middot; {formatDateTime(attachment.createdAt)}
+                                                {formatFileSize(
+                                                  attachment.fileSizeBytes,
+                                                )}{" "}
+                                                &middot;{" "}
+                                                {formatDateTime(
+                                                  attachment.createdAt,
+                                                )}
                                               </p>
                                             </div>
                                           </div>
                                           <div className="flex shrink-0 items-center gap-1.5">
                                             <button
                                               type="button"
-                                              onClick={() => handleDownloadAttachment(attachment)}
+                                              onClick={() =>
+                                                handleDownloadAttachment(
+                                                  attachment,
+                                                )
+                                              }
                                               className="rounded-lg border border-white/10 p-2 text-zinc-300 transition hover:border-white/30 hover:text-white"
                                             >
                                               <Download className="h-4 w-4" />
                                             </button>
-                                            {attachment.uploadedByUserId === currentUserId ? (
+                                            {attachment.uploadedByUserId ===
+                                            currentUserId ? (
                                               <button
                                                 type="button"
-                                                onClick={() => handleDeleteAttachment(attachment)}
+                                                onClick={() =>
+                                                  handleDeleteAttachment(
+                                                    attachment,
+                                                  )
+                                                }
                                                 className="rounded-lg border border-rose-500/30 p-2 text-rose-300 transition hover:border-rose-400/60 hover:text-rose-100"
                                               >
                                                 <Trash2 className="h-4 w-4" />
@@ -1667,119 +2250,134 @@ export default function ItStaffTicketsPage() {
                                     ? "s"
                                     : ""}
                                 </p>
-                                {selectedTicket.comments.map((comment, commentIdx) => {
-                                  const isCurrentUser = comment.authorUserId === currentUserId;
-                                  return (
-                                    <div
-                                      key={comment.id}
-                                      className={cn(
-                                        "group relative overflow-hidden rounded-xl border p-4 transition-all duration-200 hover:border-white/15",
-                                        isCurrentUser
-                                          ? "border-sky-500/20 bg-gradient-to-br from-sky-500/[0.04] to-transparent"
-                                          : "border-white/[0.06] bg-gradient-to-br from-white/[0.04] to-white/[0.01]",
-                                      )}
-                                    >
-                                      {/* Author Row */}
-                                      <div className="flex items-center justify-between gap-3">
-                                        <div className="flex items-center gap-2.5">
-                                          <div className={cn(
-                                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold uppercase",
-                                            isCurrentUser
-                                              ? "bg-sky-500/20 text-sky-300"
-                                              : "bg-zinc-700/50 text-zinc-400",
-                                          )}>
-                                            {(comment.authorUser?.firstName?.[0] ?? comment.authorUser?.email?.[0] ?? "?")}
-                                          </div>
-                                          <div>
-                                            <p className="text-sm font-medium text-zinc-100">
-                                              {formatUserName(comment.authorUser)}
-                                            </p>
-                                            <p className="text-[11px] text-zinc-500">
-                                              {formatDateTime(comment.createdAt)}
-                                            </p>
+                                {selectedTicket.comments.map(
+                                  (comment, commentIdx) => {
+                                    const isCurrentUser =
+                                      comment.authorUserId === currentUserId;
+                                    return (
+                                      <div
+                                        key={comment.id}
+                                        className={cn(
+                                          "group relative overflow-hidden rounded-xl border p-4 transition-all duration-200 hover:border-white/15",
+                                          isCurrentUser
+                                            ? "border-sky-500/20 bg-gradient-to-br from-sky-500/[0.04] to-transparent"
+                                            : "border-white/[0.06] bg-gradient-to-br from-white/[0.04] to-white/[0.01]",
+                                        )}
+                                      >
+                                        {/* Author Row */}
+                                        <div className="flex items-center justify-between gap-3">
+                                          <div className="flex items-center gap-2.5">
+                                            <div
+                                              className={cn(
+                                                "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold uppercase",
+                                                isCurrentUser
+                                                  ? "bg-sky-500/20 text-sky-300"
+                                                  : "bg-zinc-700/50 text-zinc-400",
+                                              )}
+                                            >
+                                              {comment.authorUser
+                                                ?.firstName?.[0] ??
+                                                comment.authorUser
+                                                  ?.email?.[0] ??
+                                                "?"}
+                                            </div>
+                                            <div>
+                                              <p className="text-sm font-medium text-zinc-100">
+                                                {formatUserName(
+                                                  comment.authorUser,
+                                                )}
+                                              </p>
+                                              <p className="text-[11px] text-zinc-500">
+                                                {formatDateTime(
+                                                  comment.createdAt,
+                                                )}
+                                              </p>
+                                            </div>
                                           </div>
                                         </div>
-                                      </div>
 
-                                      {/* Comment Body */}
-                                      <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-zinc-200">
-                                        {comment.body}
-                                      </p>
+                                        {/* Comment Body */}
+                                        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-zinc-200">
+                                          {comment.body}
+                                        </p>
 
-                                      {/* Comment Attachments */}
-                                      {comment.attachments &&
-                                      comment.attachments.length > 0 ? (
-                                        <div className="mt-3 space-y-2">
-                                          {comment.attachments.map(
-                                            (attachment) => (
-                                              <div
-                                                key={attachment.id}
-                                                className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]"
-                                              >
-                                                {attachment.fileType?.startsWith(
-                                                  "image/",
-                                                ) ? (
-                                                  <div className="border-b border-white/10 bg-white/[0.02] p-2">
-                                                    <AttachmentImage
-                                                      attachment={attachment}
-                                                      onView={(src, name) => {
-                                                        setLightboxSrc(src);
-                                                        setLightboxFileName(name);
-                                                      }}
-                                                    />
-                                                  </div>
-                                                ) : null}
-                                                <div className="flex items-center justify-between px-3 py-2">
-                                                  <div className="min-w-0">
-                                                    <p className="truncate text-xs text-zinc-100">
-                                                      {attachment.fileName}
-                                                    </p>
-                                                    <p className="text-[10px] text-zinc-500">
-                                                      {formatFileSize(
-                                                        attachment.fileSizeBytes,
-                                                      )}{" "}
-                                                      {"\u00B7"}{" "}
-                                                      {formatDateTime(
-                                                        attachment.createdAt,
-                                                      )}
-                                                    </p>
-                                                  </div>
-                                                  <div className="flex items-center gap-1">
-                                                    <button
-                                                      type="button"
-                                                      onClick={() =>
-                                                        handleDownloadAttachment(
-                                                          attachment,
-                                                        )
-                                                      }
-                                                      className="rounded-full border border-white/10 p-1.5 text-zinc-300 transition hover:border-white/30 hover:text-white"
-                                                    >
-                                                      <Download className="h-3.5 w-3.5" />
-                                                    </button>
-                                                    {attachment.uploadedByUserId ===
-                                                    currentUserId ? (
+                                        {/* Comment Attachments */}
+                                        {comment.attachments &&
+                                        comment.attachments.length > 0 ? (
+                                          <div className="mt-3 space-y-2">
+                                            {comment.attachments.map(
+                                              (attachment) => (
+                                                <div
+                                                  key={attachment.id}
+                                                  className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]"
+                                                >
+                                                  {attachment.fileType?.startsWith(
+                                                    "image/",
+                                                  ) ? (
+                                                    <div className="border-b border-white/10 bg-white/[0.02] p-2">
+                                                      <AttachmentImage
+                                                        attachment={attachment}
+                                                        onView={(src, name) => {
+                                                          setLightboxSrc(src);
+                                                          setLightboxFileName(
+                                                            name,
+                                                          );
+                                                        }}
+                                                      />
+                                                    </div>
+                                                  ) : null}
+                                                  <div className="flex items-center justify-between px-3 py-2">
+                                                    <div className="min-w-0">
+                                                      <p className="truncate text-xs text-zinc-100">
+                                                        {attachment.fileName}
+                                                      </p>
+                                                      <p className="text-[10px] text-zinc-500">
+                                                        {formatFileSize(
+                                                          attachment.fileSizeBytes,
+                                                        )}{" "}
+                                                        {"\u00B7"}{" "}
+                                                        {formatDateTime(
+                                                          attachment.createdAt,
+                                                        )}
+                                                      </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
                                                       <button
                                                         type="button"
                                                         onClick={() =>
-                                                          handleDeleteAttachment(
+                                                          handleDownloadAttachment(
                                                             attachment,
                                                           )
                                                         }
-                                                        className="rounded-full border border-rose-500/30 p-1.5 text-rose-300 transition hover:border-rose-400/60 hover:text-rose-100"
+                                                        className="rounded-full border border-white/10 p-1.5 text-zinc-300 transition hover:border-white/30 hover:text-white"
                                                       >
-                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                        <Download className="h-3.5 w-3.5" />
                                                       </button>
-                                                    ) : null}
+                                                      {attachment.uploadedByUserId ===
+                                                      currentUserId ? (
+                                                        <button
+                                                          type="button"
+                                                          onClick={() =>
+                                                            handleDeleteAttachment(
+                                                              attachment,
+                                                            )
+                                                          }
+                                                          className="rounded-full border border-rose-500/30 p-1.5 text-rose-300 transition hover:border-rose-400/60 hover:text-rose-100"
+                                                        >
+                                                          <Trash2 className="h-3.5 w-3.5" />
+                                                        </button>
+                                                      ) : null}
+                                                    </div>
                                                   </div>
                                                 </div>
-                                              </div>
-                                            ),
-                                          )}
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                  );
-                                })}
+                                              ),
+                                            )}
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    );
+                                  },
+                                )}
                               </div>
                             ) : (
                               <div className="rounded-xl border border-white/10 bg-white/5 p-10 text-center text-sm text-zinc-500">
@@ -1791,11 +2389,23 @@ export default function ItStaffTicketsPage() {
                             <div className="space-y-3 rounded-xl border border-white/10 bg-gradient-to-br from-white/[0.04] to-transparent p-5">
                               <div className="flex items-center gap-2">
                                 <div className="flex h-5 w-5 items-center justify-center rounded-md bg-zinc-800">
-                                  <svg className="h-3 w-3 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                  <svg
+                                    className="h-3 w-3 text-zinc-400"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                                    />
                                   </svg>
                                 </div>
-                                <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400">Add a comment</span>
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400">
+                                  Add a comment
+                                </span>
                               </div>
                               <Textarea
                                 value={commentBody}
@@ -1887,40 +2497,298 @@ export default function ItStaffTicketsPage() {
   );
 }
 
+function PaginationBar({
+  currentPage,
+  totalPages,
+  totalItems,
+  pageSize,
+  onPageChange,
+}: {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+}) {
+  const pageNumbers: (number | "ellipsis")[] = [];
+  for (let i = 1; i <= totalPages; i++) {
+    if (
+      i === 1 ||
+      i === totalPages ||
+      (i >= currentPage - 1 && i <= currentPage + 1)
+    ) {
+      pageNumbers.push(i);
+    } else if (pageNumbers[pageNumbers.length - 1] !== "ellipsis") {
+      pageNumbers.push("ellipsis");
+    }
+  }
+
+  const startItem = (currentPage - 1) * pageSize + 1;
+  const endItem = Math.min(currentPage * pageSize, totalItems);
+
+  return (
+    <div className="flex shrink-0 items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-2.5">
+      <p className="text-xs text-zinc-500">
+        Showing{" "}
+        <span className="font-medium text-zinc-300">
+          {startItem}&#8211;{endItem}
+        </span>{" "}
+        of <span className="font-medium text-zinc-300">{totalItems}</span>
+      </p>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage <= 1}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-30"
+        >
+          <svg
+            className="h-3.5 w-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+        </button>
+        {pageNumbers.map((page, i) =>
+          page === "ellipsis" ? (
+            <span
+              key={"e-" + i}
+              className="flex h-7 w-5 items-center justify-center text-xs text-zinc-600"
+            >
+              &#8230;
+            </span>
+          ) : (
+            <button
+              key={page}
+              type="button"
+              onClick={() => onPageChange(page)}
+              className={
+                "flex h-7 min-w-[28px] items-center justify-center rounded-lg px-1.5 text-xs font-medium transition " +
+                (page === currentPage
+                  ? "bg-white/15 text-white shadow-sm"
+                  : "text-zinc-400 hover:bg-white/10 hover:text-zinc-200")
+              }
+            >
+              {page}
+            </button>
+          ),
+        )}
+        <button
+          type="button"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage >= totalPages}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-30"
+        >
+          <svg
+            className="h-3.5 w-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Modern Metadata Item ──
 
 const metadataIconMap: Record<string, React.ReactNode> = {
-  folder: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>,
-  monitor: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
-  user: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
-  building: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
-  target: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-  calendar: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
-  check: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-  clock: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-  alert: <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>,
+  folder: (
+    <svg
+      className="h-2.5 w-2.5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+      />
+    </svg>
+  ),
+  monitor: (
+    <svg
+      className="h-2.5 w-2.5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+      />
+    </svg>
+  ),
+  user: (
+    <svg
+      className="h-2.5 w-2.5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+      />
+    </svg>
+  ),
+  building: (
+    <svg
+      className="h-2.5 w-2.5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+      />
+    </svg>
+  ),
+  target: (
+    <svg
+      className="h-2.5 w-2.5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
+    </svg>
+  ),
+  calendar: (
+    <svg
+      className="h-2.5 w-2.5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+      />
+    </svg>
+  ),
+  check: (
+    <svg
+      className="h-2.5 w-2.5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
+    </svg>
+  ),
+  clock: (
+    <svg
+      className="h-2.5 w-2.5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
+    </svg>
+  ),
+  alert: (
+    <svg
+      className="h-2.5 w-2.5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
+      />
+    </svg>
+  ),
 };
 
-function ModernMetadataItem({ icon, label, value }: { icon: string; label: string; value: string }) {
-  const isBreached = value === "Yes" && (label.includes("Breached"));
+function ModernMetadataItem({
+  icon,
+  label,
+  value,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+}) {
+  const isBreached = value === "Yes" && label.includes("Breached");
   return (
     <div className="group relative overflow-hidden rounded-lg border border-white/[0.05] bg-gradient-to-br from-white/[0.02] to-transparent px-3 py-2 transition-all duration-200 hover:border-white/[0.1] hover:from-white/[0.04]">
       <div className="flex items-center gap-2.5">
-        <div className={cn(
-          "flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors",
-          isBreached ? "bg-rose-500/15 text-rose-400" : "bg-zinc-800/60 text-zinc-500 group-hover:text-zinc-400",
-        )}>
+        <div
+          className={cn(
+            "flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors",
+            isBreached
+              ? "bg-rose-500/15 text-rose-400"
+              : "bg-zinc-800/60 text-zinc-500 group-hover:text-zinc-400",
+          )}
+        >
           {metadataIconMap[icon]}
         </div>
         <div className="min-w-0">
-          <p className={cn(
-            "text-[11px] font-medium uppercase tracking-[0.12em]",
-            isBreached ? "text-rose-400" : "text-zinc-500",
-          )}>{label}</p>
-          <p className={cn(
-            "truncate text-xs font-medium",
-            value === "—" ? "text-zinc-500" : isBreached ? "text-rose-200" : "text-zinc-100",
-          )}>{value}</p>
+          <p
+            className={cn(
+              "text-[11px] font-medium uppercase tracking-[0.12em]",
+              isBreached ? "text-rose-400" : "text-zinc-500",
+            )}
+          >
+            {label}
+          </p>
+          <p
+            className={cn(
+              "truncate text-xs font-medium",
+              value === "—"
+                ? "text-zinc-500"
+                : isBreached
+                  ? "text-rose-200"
+                  : "text-zinc-100",
+            )}
+          >
+            {value}
+          </p>
         </div>
       </div>
     </div>

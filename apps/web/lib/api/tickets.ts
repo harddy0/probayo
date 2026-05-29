@@ -72,6 +72,12 @@ const buildTicketQuery = (filters?: TicketListFilters) => {
   if (filters.knownIssueId) {
     params.set("knownIssueId", filters.knownIssueId);
   }
+  if (filters.page) {
+    params.set("page", String(filters.page));
+  }
+  if (filters.pageSize) {
+    params.set("pageSize", String(filters.pageSize));
+  }
 
   const query = params.toString();
   return query ? `?${query}` : "";
@@ -146,7 +152,6 @@ export const fetchTicketsByKnownIssue = async (
 ): Promise<TicketListResponse> => {
   return fetchTickets({ knownIssueId });
 };
-
 
 export const deleteTicket = async (id: string): Promise<void> => {
   await request<void>(`/tickets/${id}`, {
