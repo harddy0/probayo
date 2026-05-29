@@ -12,7 +12,7 @@ import {
   unassignTicket,
   updateTicket,
 } from "./tickets";
-import type { Ticket } from "../types/tickets";
+import type { PaginationMeta, Ticket } from "../types/tickets";
 import type {
   ItStaffDashboardStats,
   ItStaffTicketView,
@@ -44,29 +44,36 @@ export const fetchItStaffTickets = async (
   filters?: {
     status?: TicketStatus;
     priority?: TicketPriority;
+    page?: number;
+    pageSize?: number;
   },
-): Promise<Ticket[]> => {
+): Promise<{ data: Ticket[]; meta?: PaginationMeta }> => {
+  let response;
   if (view === "unassigned") {
-    // Use the unassigned flag to filter for tickets with no assignee
-    return fetchTickets({
+    response = await fetchTickets({
       unassigned: true,
+      ...(filters?.page ? { page: filters.page } : {}),
+      ...(filters?.pageSize ? { pageSize: filters.pageSize } : {}),
       ...(filters?.status ? { status: filters.status } : {}),
       ...(filters?.priority ? { priority: filters.priority } : {}),
     });
-  }
-
-  if (view === "my-tickets" && userId) {
-    return fetchTickets({
+  } else if (view === "my-tickets" && userId) {
+    response = await fetchTickets({
       assignedToUserId: userId,
+      ...(filters?.page ? { page: filters.page } : {}),
+      ...(filters?.pageSize ? { pageSize: filters.pageSize } : {}),
+      ...(filters?.status ? { status: filters.status } : {}),
+      ...(filters?.priority ? { priority: filters.priority } : {}),
+    });
+  } else {
+    response = await fetchTickets({
+      ...(filters?.page ? { page: filters.page } : {}),
+      ...(filters?.pageSize ? { pageSize: filters.pageSize } : {}),
       ...(filters?.status ? { status: filters.status } : {}),
       ...(filters?.priority ? { priority: filters.priority } : {}),
     });
   }
-
-  return fetchTickets({
-    ...(filters?.status ? { status: filters.status } : {}),
-    ...(filters?.priority ? { priority: filters.priority } : {}),
-  });
+  return { data: response.data ?? [], meta: response.meta };
 };
 
 // ── Ticket Actions ──
@@ -112,7 +119,8 @@ export const releaseTicket = async (ticketId: string): Promise<Ticket> => {
 export const fetchItStaffDashboardStats = async (
   userId: string,
 ): Promise<ItStaffDashboardStats> => {
-  const allTickets = await fetchTickets();
+  const response = await fetchTickets();
+  const allTickets = response.data ?? [];
 
   const stats: ItStaffDashboardStats = {
     totalOpen: 0,
@@ -141,13 +149,15 @@ export const fetchItStaffDashboardStats = async (
     }
 
     // Unassigned
-    if (!ticket.assignedToUserId) {
+    const assigneeId = ticket.assignedToUserId ?? ticket.assignedTo?.id ?? null;
+
+    if (!assigneeId) {
       stats.unassigned++;
     }
 
     // My active tickets
     if (
-      ticket.assignedToUserId === userId &&
+      assigneeId === userId &&
       ticket.status !== "Resolved" &&
       ticket.status !== "Closed"
     ) {

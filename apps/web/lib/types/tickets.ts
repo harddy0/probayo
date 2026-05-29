@@ -44,6 +44,44 @@ export type TicketUserSummary = {
   email: string;
   firstName?: string;
   lastName?: string;
+  fullName?: string;
+};
+
+/** API reference DTOs (from backend paginated responses) */
+export type UserReference = {
+  id: string;
+  fullName?: string;
+  email?: string;
+};
+
+export type DepartmentReference = {
+  id: string;
+  name: string;
+};
+
+export type CategoryReference = {
+  id: string;
+  name: string;
+};
+
+export type AssetReference = {
+  id: string;
+  assetTag: string;
+  deviceType: string;
+};
+
+export type PaginationMeta = {
+  itemsPerPage: number;
+  totalItems: number;
+  currentPage: number;
+  totalPages: number;
+};
+
+export type PaginationLinks = {
+  first?: string;
+  previous?: string;
+  next?: string;
+  last?: string;
 };
 
 export type TicketDepartment = {
@@ -123,6 +161,12 @@ export type Ticket = {
   attachments?: TicketAttachment[];
   statusHistory?: TicketStatusHistory[];
   _count?: TicketCounts;
+
+  // ── New API DTO fields (from TicketResponseDto) ──
+  filedBy?: UserReference;
+  assignedTo?: UserReference | null;
+  commentsCount?: number;
+  attachmentsCount?: number;
 };
 
 export type TicketListFilters = {
@@ -135,9 +179,17 @@ export type TicketListFilters = {
   unassigned?: boolean;
   /** Filter tickets attached to a specific known issue */
   knownIssueId?: string;
+  /** Page number for pagination (1-based) */
+  page?: number;
+  /** Number of items per page */
+  pageSize?: number;
 };
 
-export type TicketListResponse = Ticket[];
+export type TicketListResponse = {
+  data: Ticket[];
+  meta: PaginationMeta;
+  links: PaginationLinks;
+};
 
 export type CreateTicketRequest = {
   title: string;

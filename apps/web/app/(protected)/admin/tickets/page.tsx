@@ -8,6 +8,8 @@ import {
   Bug,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Download,
   FileUp,
@@ -49,6 +51,7 @@ import {
 } from "@/lib/api/tickets";
 import { bulkAttachKnownIssue, updateKnownIssueStatus } from "@/lib/api/known-issues";
 import type {
+  PaginationMeta,
   Ticket as TicketRecord,
   TicketAttachment,
   TicketPriority,
@@ -76,6 +79,7 @@ const ALLOWED_MIME_TYPES = [
 const ACCEPTED_FILE_TYPES = ALLOWED_MIME_TYPES.join(",");
 const UPLOAD_POLL_INTERVAL_MS = 1500;
 const UPLOAD_MAX_ATTEMPTS = 40;
+const PAGE_SIZE = 10;
 
 const statusLabels: Record<TicketStatus, string> = {
   Open: "Open",
@@ -161,10 +165,10 @@ const formatFileSize = (bytes?: number | null) => {
 };
 
 const formatUserName = (
-  user?: { firstName?: string; lastName?: string; email?: string } | null,
+  user?: { firstName?: string; lastName?: string; fullName?: string; email?: string } | null,
 ) => {
   if (!user) return "—";
-  const name = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
+  const name = user.fullName || `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
   return name || user.email || "—";
 };
 
@@ -470,6 +474,8 @@ export default function AdminTicketsPage() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<TicketRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [paginationMeta, setPaginationMeta] = useState<PaginationMeta | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -579,18 +585,24 @@ export default function AdminTicketsPage() {
   }, [tickets, searchQuery, filterStatus, filterPriority]);
 
   // ── Load Functions ──
-  const loadTickets = useCallback(async () => {
+  const loadTickets = useCallback(async (pageOverride?: number) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await fetchTickets();
-      setTickets(data);
+      const response = await fetchTickets({
+        page: pageOverride ?? currentPage,
+        pageSize: PAGE_SIZE,
+        ...(filterStatus && filterStatus !== "all" ? { status: filterStatus as TicketStatus } : {}),
+        ...(filterPriority && filterPriority !== "all" ? { priority: filterPriority as TicketPriority } : {}),
+      });
+      setTickets(response.data ?? []);
+      if (response.meta) setPaginationMeta(response.meta);
     } catch (err) {
       setError(isApiError(err) ? err.message : "Failed to load tickets.");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentPage, filterStatus, filterPriority]);
 
   const loadTicketDetail = useCallback(async (ticketId: string) => {
     activeDetailRequestRef.current = ticketId;
@@ -648,7 +660,8 @@ export default function AdminTicketsPage() {
   // ── Handlers ──
 
   const handleRefresh = async () => {
-    await loadTickets();
+    setCurrentPage(1);
+    await loadTickets(1);
   };
 
   const handleRowClick = (ticketId: string) => {
@@ -860,7 +873,7 @@ export default function AdminTicketsPage() {
             className="h-10 w-full rounded-2xl border border-white/10 bg-white/5 pl-10 pr-4 text-sm text-zinc-50 outline-none transition placeholder:text-zinc-500 hover:border-white/20 focus:border-white/30 focus:ring-2 focus:ring-white/20"
           />
         </div>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
+        <Select value={filterStatus} onValueChange={(v) => { setFilterStatus(v); setCurrentPage(1); }}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
@@ -871,7 +884,7 @@ export default function AdminTicketsPage() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={filterPriority} onValueChange={setFilterPriority}>
+        <Select value={filterPriority} onValueChange={(v) => { setFilterPriority(v); setCurrentPage(1); }}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="All priorities" />
           </SelectTrigger>
@@ -933,7 +946,7 @@ export default function AdminTicketsPage() {
               <tbody className="divide-y divide-white/[0.06]">
                 {filteredTickets.map((ticket, index) => {
                   const currentIdx = STATUS_ORDER.indexOf(ticket.status as typeof STATUS_ORDER[number]);
-                  const isUnassigned = !ticket.assignedToUserId;
+                  const isUnassigned = !ticket.assignedToUserId && !ticket.assignedTo?.id;
 
                   return (
                     <tr
@@ -950,7 +963,7 @@ export default function AdminTicketsPage() {
                             <p className="truncate text-sm font-medium text-zinc-100">{ticket.title}</p>
                           </div>
                           <p className="truncate text-xs text-zinc-500">
-                            {ticket.filedByUser ? formatUserName(ticket.filedByUser) : "—"}
+                            {(ticket.filedBy ?? ticket.filedByUser) ? formatUserName(ticket.filedBy ?? ticket.filedByUser) : "—"}
                           </p>
                         </div>
                       </td>
@@ -1005,7 +1018,7 @@ export default function AdminTicketsPage() {
                         />
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-sm text-zinc-400">
-                        {formatUserName(ticket.assignedToUser)}
+                        {formatUserName(ticket.assignedTo ?? ticket.assignedToUser)}
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
@@ -1040,6 +1053,17 @@ export default function AdminTicketsPage() {
           </div>
         )}
       </div>
+
+      {/* ── Pagination ── */}
+      {paginationMeta && !isLoading ? (
+        <PaginationBar
+          currentPage={currentPage}
+          totalPages={paginationMeta.totalPages}
+          totalItems={paginationMeta.totalItems}
+          pageSize={paginationMeta.itemsPerPage}
+          onPageChange={(page) => setCurrentPage(page)}
+        />
+      ) : null}
 
       {/* ── Assignment Modal ── */}
       <AssignUserModal
@@ -1128,9 +1152,9 @@ export default function AdminTicketsPage() {
                           </div>
                           <div className="mt-1 flex items-center gap-3 text-xs text-zinc-500">
                             <span>ID: {selectedTicket.id}</span>
-                            {selectedTicket.assignedToUser ? (
+                            {(selectedTicket.assignedTo ?? selectedTicket.assignedToUser) ? (
                               <span>
-                                Assigned to: {formatUserName(selectedTicket.assignedToUser)}
+                                Assigned to: {formatUserName(selectedTicket.assignedTo ?? selectedTicket.assignedToUser)}
                               </span>
                             ) : (
                               <span className="text-amber-400">Unassigned</span>
@@ -1146,7 +1170,7 @@ export default function AdminTicketsPage() {
                               </span>
                             ) : (
                               <>
-                                {!selectedTicket.assignedToUserId ? (
+                                {!selectedTicket.assignedToUserId && !selectedTicket.assignedTo?.id ? (
                                   <Button
                                     className="h-8 text-xs"
                                     onClick={() => setAssignTicketId(selectedTicket.id)}
@@ -1417,9 +1441,9 @@ export default function AdminTicketsPage() {
                               <div className="space-y-1.5">
                                 <ModernMetadataItem icon="folder" label="Category" value={selectedTicket.category?.name || "—"} />
                                 <ModernMetadataItem icon="monitor" label="Asset" value={selectedTicket.asset?.deviceType || "—"} />
-                                <ModernMetadataItem icon="user" label="Requested by" value={formatUserName(selectedTicket.filedByUser)} />
+                                <ModernMetadataItem icon="user" label="Requested by" value={formatUserName(selectedTicket.filedBy ?? selectedTicket.filedByUser)} />
                                 <ModernMetadataItem icon="building" label="Department" value={selectedTicket.department?.name || "—"} />
-                                <ModernMetadataItem icon="target" label="Assigned to" value={formatUserName(selectedTicket.assignedToUser)} />
+                                <ModernMetadataItem icon="target" label="Assigned to" value={formatUserName(selectedTicket.assignedTo ?? selectedTicket.assignedToUser)} />
                                 <ModernMetadataItem icon="calendar" label="Created" value={formatDateTime(selectedTicket.createdAt)} />
                                 <ModernMetadataItem icon="calendar" label="Updated" value={formatDateTime(selectedTicket.updatedAt)} />
                                 <ModernMetadataItem icon="check" label="Acknowledged" value={formatDateTime(selectedTicket.acknowledgedAt)} />
@@ -1786,6 +1810,87 @@ export default function AdminTicketsPage() {
           )
         : null}
     </section>
+  );
+}
+
+
+// ── Pagination Bar ──
+
+function PaginationBar({
+  currentPage,
+  totalPages,
+  totalItems,
+  pageSize,
+  onPageChange,
+}: {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+}) {
+  // Generate page numbers with ellipsis
+  const pageNumbers: (number | 'ellipsis')[] = [];
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+      pageNumbers.push(i);
+    } else if (pageNumbers[pageNumbers.length - 1] !== 'ellipsis') {
+      pageNumbers.push('ellipsis');
+    }
+  }
+
+  const startItem = (currentPage - 1) * pageSize + 1;
+  const endItem = Math.min(currentPage * pageSize, totalItems);
+
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-2.5">
+      <span className="text-xs text-zinc-500">
+        Showing {startItem}–{endItem} of {totalItems} ticket{totalItems !== 1 ? 's' : ''}
+      </span>
+      <div className="flex items-center gap-1">
+        {/* Previous */}
+        <button
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage <= 1}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-zinc-400 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+          aria-label="Previous page"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+
+        {/* Page Numbers */}
+        {pageNumbers.map((page, idx) =>
+          page === 'ellipsis' ? (
+            <span key={'e-' + idx} className="flex h-8 w-6 items-center justify-center text-xs text-zinc-600">
+              …
+            </span>
+          ) : (
+            <button
+              key={page}
+              onClick={() => onPageChange(page)}
+              className={cn(
+                "flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2 text-xs font-medium transition",
+                page === currentPage
+                  ? "bg-white/15 text-white"
+                  : "border border-white/10 text-zinc-400 hover:bg-white/10 hover:text-white",
+              )}
+            >
+              {page}
+            </button>
+          ),
+        )}
+
+        {/* Next */}
+        <button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage >= totalPages}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-zinc-400 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+          aria-label="Next page"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
   );
 }
 

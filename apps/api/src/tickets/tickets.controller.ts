@@ -30,6 +30,7 @@ import { TicketResponseDto } from './dto/ticket-response.dto';
 import { CreateTicketCommentDto } from './dto/create-comment.dto';
 import { UpdateTicketCommentDto } from './dto/update-comment.dto';
 import { BulkAttachIssueDto } from './dto/bulk-attach-issue.dto';
+import { TicketPageResponseDto } from './dto/ticket-page-response.dto';
 
 @ApiTags('tickets')
 @ApiBearerAuth()
@@ -79,10 +80,19 @@ export class TicketsController {
   @ApiQuery({ name: 'assignedToUserId', required: false, type: 'string' })
   @ApiQuery({ name: 'departmentId', required: false, type: 'string' })
   @ApiQuery({ name: 'categoryId', required: false, type: 'string' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    type: [String],
+    description: 'Format: field:ASC or field:DESC',
+  })
   @ApiResponse({
     status: 200,
     description: 'Returns all tickets',
-    type: [TicketResponseDto],
+    type: TicketPageResponseDto,
   })
   findAll(@Request() req: { user: { id: string } }, @Query() filters: any) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument

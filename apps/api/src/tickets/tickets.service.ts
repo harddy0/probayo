@@ -26,6 +26,13 @@ type TicketActor = {
   departmentId?: string | null;
 };
 
+type TicketListQuery = Prisma.TicketWhereInput & {
+  page?: number | string;
+  limit?: number | string;
+  search?: string;
+  sortBy?: string[] | string;
+};
+
 @Injectable()
 export class TicketsService {
   constructor(
@@ -45,6 +52,10 @@ export class TicketsService {
 
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+
+    if (user.role === UserRole.DepartmentHead) {
+      throw new ForbiddenException('Department heads cannot file tickets');
     }
 
     if (!user.departmentId) {
@@ -136,7 +147,7 @@ export class TicketsService {
   }
 
   // ==================== FIND ALL TICKETS (Role-based) ====================
-  async findAll(userId: string, filters?: Prisma.TicketWhereInput) {
+  async findAll(userId: string, filters?: TicketListQuery) {
     const where: Prisma.TicketWhereInput = {};
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -178,30 +189,61 @@ export class TicketsService {
       where.categoryId = filters.categoryId;
     }
 
-    return this.prisma.ticket.findMany({
-      where,
-      include: {
-        filedByUser: {
-          select: { id: true, email: true, firstName: true, lastName: true },
-        },
-        assignedToUser: {
-          select: { id: true, email: true, firstName: true, lastName: true },
-        },
-        department: true,
-        category: true,
-        asset: true,
-        _count: {
-          select: {
-            comments: true,
-            attachments: true,
+    if (filters?.search) {
+      where.OR = [
+        { title: { contains: filters.search } },
+        { description: { contains: filters.search } },
+      ];
+    }
+
+    const page = this.parsePositiveNumber(filters?.page, 1);
+    const limit = Math.min(this.parsePositiveNumber(filters?.limit, 50), 50);
+    const orderBy = this.normalizeSortBy(filters?.sortBy);
+
+    if (orderBy.length === 0) {
+      orderBy.push({ priority: 'desc' }, { slaAckDeadline: 'asc' });
+    }
+
+    const [items, totalItems] = await this.prisma.$transaction([
+      this.prisma.ticket.findMany({
+        where,
+        include: {
+          filedByUser: {
+            select: { id: true, email: true, firstName: true, lastName: true },
+          },
+          assignedToUser: {
+            select: { id: true, email: true, firstName: true, lastName: true },
+          },
+          department: true,
+          category: true,
+          asset: true,
+          _count: {
+            select: {
+              comments: true,
+              attachments: true,
+            },
           },
         },
+        orderBy,
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.ticket.count({ where }),
+    ]);
+
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+    const links = this.buildPageLinks(filters, page, totalPages, limit);
+
+    return {
+      data: items,
+      meta: {
+        itemsPerPage: limit,
+        totalItems,
+        currentPage: page,
+        totalPages,
       },
-      orderBy: [
-        { priority: 'desc' }, // critical first
-        { slaAckDeadline: 'asc' }, // soonest deadlines first
-      ],
-    });
+      links,
+    };
   }
 
   // ==================== FIND ONE TICKET ====================
@@ -1183,7 +1225,7 @@ export class TicketsService {
       case UserRole.ItStaff:
         return true;
       case UserRole.DepartmentHead:
-        return user.departmentId === ticket.departmentId;
+        return false;
       case UserRole.Employee:
         return user.id === ticket.filedByUserId;
       default:
@@ -1195,5 +1237,80 @@ export class TicketsService {
     if (ticket.status === TicketStatus.Closed) {
       throw new BadRequestException('Closed tickets cannot be assigned');
     }
+  }
+
+  private parsePositiveNumber(value: unknown, fallback: number): number {
+    if (value == null) return fallback;
+    const parsed = Number(value);
+    if (Number.isNaN(parsed) || parsed <= 0) return fallback;
+    return Math.floor(parsed);
+  }
+
+  private buildPageLinks(
+    filters: TicketListQuery | undefined,
+    page: number,
+    totalPages: number,
+    limit: number,
+  ) {
+    const buildUrl = (targetPage: number) => {
+      const params = new URLSearchParams();
+      params.set('page', String(targetPage));
+      params.set('limit', String(limit));
+
+      if (filters?.status) params.set('status', String(filters.status));
+      if (filters?.priority) params.set('priority', String(filters.priority));
+      if (filters?.assignedToUserId)
+        params.set('assignedToUserId', String(filters.assignedToUserId));
+      if (filters?.departmentId)
+        params.set('departmentId', String(filters.departmentId));
+      if (filters?.categoryId)
+        params.set('categoryId', String(filters.categoryId));
+      if (filters?.search) params.set('search', String(filters.search));
+
+      this.normalizeSortBy(filters?.sortBy).forEach((entry) => {
+        const [field, direction] = Object.entries(entry)[0] ?? [];
+        if (field && direction) {
+          params.append('sortBy', `${field}:${direction}`);
+        }
+      });
+
+      return `/tickets?${params.toString()}`;
+    };
+
+    const first = buildUrl(1);
+    const last = buildUrl(totalPages);
+    const previous = page > 1 ? buildUrl(page - 1) : undefined;
+    const next = page < totalPages ? buildUrl(page + 1) : undefined;
+
+    return {
+      first,
+      previous,
+      next,
+      last,
+    };
+  }
+
+  private normalizeSortBy(value?: string[] | string) {
+    const raw = Array.isArray(value) ? value : value ? [value] : [];
+    const allowed = new Set([
+      'createdAt',
+      'priority',
+      'status',
+      'slaAckDeadline',
+      'slaResolutionDeadline',
+    ]);
+
+    return raw
+      .map((entry) => {
+        const [field, direction] = entry.split(':');
+        if (!field || !allowed.has(field)) return null;
+        const normalizedDirection =
+          direction?.toLowerCase() === 'asc' ? 'asc' : 'desc';
+        return { [field]: normalizedDirection } as Record<
+          string,
+          'asc' | 'desc'
+        >;
+      })
+      .filter((entry): entry is Record<string, 'asc' | 'desc'> => !!entry);
   }
 }

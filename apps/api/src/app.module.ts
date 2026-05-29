@@ -25,6 +25,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { NotificationsModule } from './notifications/notifications.module';
 import { KnownIssuesModule } from './known-issues/known-issues.module';
+import { DepartmentHeadModule } from './department-head/department-head.module';
 
 @Module({
   imports: [
@@ -105,6 +106,7 @@ import { KnownIssuesModule } from './known-issues/known-issues.module';
     MailModule,
     NotificationsModule,
     KnownIssuesModule,
+    DepartmentHeadModule,
   ],
   controllers: [AppController],
   providers: [AppService],

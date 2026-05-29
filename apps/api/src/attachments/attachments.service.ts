@@ -51,6 +51,12 @@ export class AttachmentsService {
       throw new NotFoundException('User not found');
     }
 
+    if (user.role === UserRole.DepartmentHead) {
+      throw new ForbiddenException(
+        'Department heads cannot upload attachments',
+      );
+    }
+
     const canUpload = this.canUploadToTicket(user, ticket);
 
     if (!canUpload) {
@@ -239,6 +245,12 @@ export class AttachmentsService {
       throw new NotFoundException('User not found');
     }
 
+    if (user.role === UserRole.DepartmentHead) {
+      throw new ForbiddenException(
+        'Department heads cannot delete attachments',
+      );
+    }
+
     const canDelete =
       attachment.uploadedByUserId === userId ||
       user.role === UserRole.Admin ||
@@ -269,7 +281,7 @@ export class AttachmentsService {
       case UserRole.ItStaff:
         return true;
       case UserRole.DepartmentHead:
-        return user.departmentId === ticket.departmentId;
+        return false;
       case UserRole.Employee:
         return user.id === ticket.filedByUserId;
       default:

@@ -156,11 +156,12 @@ const formatUserName = (
   user?: {
     firstName?: string;
     lastName?: string;
+    fullName?: string;
     email?: string;
   } | null,
 ) => {
   if (!user) return "-";
-  const name = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
+  const name = user.fullName || `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
   return name || user.email || "-";
 };
 
@@ -345,8 +346,8 @@ export default function ClientTicketsPage() {
     setError(null);
 
     try {
-      const data = await fetchTickets(filters);
-      setTickets(data);
+      const response = await fetchTickets(filters);
+      setTickets(response.data ?? []);
     } catch (err) {
       setError(isApiError(err) ? err.message : "Failed to load tickets.");
     } finally {
@@ -812,8 +813,8 @@ export default function ClientTicketsPage() {
                       {formatDateTime(ticket.createdAt)}
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-right text-sm text-zinc-500">
-                      {ticket._count?.comments ?? 0} /{" "}
-                      {ticket._count?.attachments ?? 0}
+                      {ticket.commentsCount ?? ticket._count?.comments ?? 0} /{" "}
+                      {ticket.attachmentsCount ?? ticket._count?.attachments ?? 0}
                     </td>
                   </tr>
                 ))}
@@ -1016,7 +1017,7 @@ export default function ClientTicketsPage() {
                               <div className="space-y-1.5">
                                 <ModernMetadataItem icon="folder" label="Category" value={selectedTicket.category?.name || "-"} />
                                 <ModernMetadataItem icon="monitor" label="Asset" value={selectedTicket.asset?.deviceType || "-"} />
-                                <ModernMetadataItem icon="target" label="Assigned to" value={formatUserName(selectedTicket.assignedToUser)} />
+                                <ModernMetadataItem icon="target" label="Assigned to" value={formatUserName(selectedTicket.assignedTo ?? selectedTicket.assignedToUser)} />
                                 <ModernMetadataItem icon="calendar" label="Created" value={formatDateTime(selectedTicket.createdAt)} />
                                 <ModernMetadataItem icon="calendar" label="Updated" value={formatDateTime(selectedTicket.updatedAt)} />
                                 <ModernMetadataItem icon="check" label="Acknowledged" value={formatDateTime(selectedTicket.acknowledgedAt)} />
