@@ -48,6 +48,10 @@ export class CommentsService {
       throw new NotFoundException('User not found');
     }
 
+    if (user.role === UserRole.DepartmentHead) {
+      throw new ForbiddenException('Department heads cannot add comments');
+    }
+
     const canComment = this.canCommentOnTicket(user, ticket);
     if (!canComment) {
       throw new ForbiddenException(
@@ -111,6 +115,10 @@ export class CommentsService {
       throw new NotFoundException('User not found');
     }
 
+    if (user.role === UserRole.DepartmentHead) {
+      throw new ForbiddenException('Department heads cannot update comments');
+    }
+
     const canView = this.canViewTicket(user, ticket);
     if (!canView) {
       throw new ForbiddenException(
@@ -169,6 +177,10 @@ export class CommentsService {
 
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+
+    if (user.role === UserRole.DepartmentHead) {
+      throw new ForbiddenException('Department heads cannot delete comments');
     }
 
     const canView = this.canViewTicket(user, comment.ticket);
@@ -269,7 +281,7 @@ export class CommentsService {
       case UserRole.ItStaff:
         return true;
       case UserRole.DepartmentHead:
-        return user.departmentId === ticket.departmentId;
+        return false;
       case UserRole.Employee:
         return user.id === ticket.filedByUserId;
       default:

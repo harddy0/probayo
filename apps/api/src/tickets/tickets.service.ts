@@ -47,6 +47,10 @@ export class TicketsService {
       throw new NotFoundException('User not found');
     }
 
+    if (user.role === UserRole.DepartmentHead) {
+      throw new ForbiddenException('Department heads cannot file tickets');
+    }
+
     if (!user.departmentId) {
       throw new BadRequestException(
         'User must belong to a department to file a ticket',
@@ -1183,7 +1187,7 @@ export class TicketsService {
       case UserRole.ItStaff:
         return true;
       case UserRole.DepartmentHead:
-        return user.departmentId === ticket.departmentId;
+        return false;
       case UserRole.Employee:
         return user.id === ticket.filedByUserId;
       default:
