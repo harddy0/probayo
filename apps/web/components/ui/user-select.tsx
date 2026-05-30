@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { fetchAllUsers, SimpleUser } from "@/lib/api/users";
+import { fetchAllUsers } from "@/lib/api/users";
+import type { SimpleUser } from "@/lib/types/users";
 
 type UserSelectProps = {
   value?: string;

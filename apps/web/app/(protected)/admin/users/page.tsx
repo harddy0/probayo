@@ -29,9 +29,8 @@ import {
   updateUserStatus,
   resetUserPassword,
   createUser,
-  type SimpleUser,
-  type CreateUserPayload,
 } from "@/lib/api/users";
+import type { SimpleUser, CreateUserPayload } from "@/lib/types/users";
 import { fetchAllDepartments } from "@/lib/api/departments";
 import type { Department } from "@/lib/types/departments";
 import { useToast } from "@/components/ui/toast-provider";

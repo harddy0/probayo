@@ -7,10 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast-provider";
 import { isApiError } from "@/lib/api/client";
-import {
-  updateUserProfile,
-  type UpdateUserProfilePayload,
-} from "@/lib/api/users";
+import { updateUserProfile } from "@/lib/api/users";
+import type { UpdateUserProfilePayload } from "@/lib/types/users";
 import { changePassword } from "@/lib/api/auth";
 import type { UserProfile } from "@/lib/types/auth";
 
