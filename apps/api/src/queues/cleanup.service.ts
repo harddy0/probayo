@@ -1,5 +1,6 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import * as storageInterface from '../attachments/storage/storage.interface';
 import * as fs from 'fs/promises';
@@ -11,6 +12,7 @@ export class CleanupService {
 
   constructor(
     private prisma: PrismaService,
+    private readonly configService: ConfigService,
     @Inject('IStorageService')
     private storage: storageInterface.IStorageService,
   ) {}
@@ -34,6 +36,34 @@ export class CleanupService {
       this.logger.log('Cleanup completed');
     } catch (error) {
       this.logger.error('Cleanup failed:', error);
+    }
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  async cleanupPasswordResetTokens() {
+    this.logger.log('Starting password reset token cleanup...');
+
+    try {
+      const now = new Date();
+      const retentionDays = this.getResetTokenRetentionDays();
+      const usedBefore = new Date(
+        now.getTime() - retentionDays * 24 * 60 * 60 * 1000,
+      );
+
+      const result = await this.prisma.passwordResetToken.deleteMany({
+        where: {
+          OR: [
+            { expiresAt: { lt: now } },
+            { usedAt: { not: null, lt: usedBefore } },
+          ],
+        },
+      });
+
+      this.logger.log(
+        `Password reset token cleanup removed ${result.count} rows`,
+      );
+    } catch (error) {
+      this.logger.error('Password reset token cleanup failed:', error);
     }
   }
 
@@ -68,5 +98,16 @@ export class CleanupService {
       }
     }
     return results;
+  }
+
+  private getResetTokenRetentionDays(): number {
+    const rawValue = this.configService.get('RESET_TOKEN_USED_RETENTION_DAYS');
+    const retentionDays = Number(rawValue);
+
+    if (!Number.isFinite(retentionDays) || retentionDays <= 0) {
+      return 90;
+    }
+
+    return retentionDays;
   }
 }

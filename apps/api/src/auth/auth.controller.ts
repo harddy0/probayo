@@ -20,6 +20,8 @@ import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ActiveUserGuard } from './guards/active-user.guard';
+import { PasswordResetRequestDto } from './dto/password-reset-request.dto';
+import { PasswordResetConfirmDto } from './dto/password-reset-confirm.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -87,6 +89,53 @@ export class AuthController {
       req.user.id,
       body.currentPassword,
       body.newPassword,
+    );
+  }
+
+  @Post('password-reset/request')
+  @ApiOperation({ summary: 'Request a password reset' })
+  @ApiBody({ type: PasswordResetRequestDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Password reset request accepted',
+  })
+  async requestPasswordReset(
+    @Request() req,
+    @Body() body: PasswordResetRequestDto,
+  ): Promise<{ message: string }> {
+    await this.authService.requestPasswordReset(body.email, {
+      requestIp: req.ip as string | undefined,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      userAgent: req.headers?.['user-agent'] as string | undefined,
+      frontendBaseUrl: body.frontendBaseUrl,
+    });
+
+    return {
+      message:
+        'If an account exists for this email, a password reset link will be sent.',
+    };
+  }
+
+  @Post('password-reset/confirm')
+  @ApiOperation({ summary: 'Confirm password reset' })
+  @ApiBody({ type: PasswordResetConfirmDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Password reset successful',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid or expired token',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Passwords do not match',
+  })
+  resetPassword(@Body() body: PasswordResetConfirmDto) {
+    return this.authService.resetPassword(
+      body.token,
+      body.newPassword,
+      body.confirmPassword,
     );
   }
 }

@@ -96,6 +96,7 @@ model User {
   notifications       Notification[]
   scheduledReports    ScheduledReport[]
   escalationsNotified EscalationEvent[]     @relation("EscalationNotifiedUser")
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
 }
@@ -329,4 +330,22 @@ model FailedJob {
   retry_count Int      @default(0)
 
   @@map("failed_jobs")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid()) @db.Char(36)
+  userId    String   @map("user_id") @db.Char(36)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @map("token_hash") @db.VarChar(64)
+  expiresAt DateTime @map("expires_at") @db.DateTime(0)
+  usedAt    DateTime? @map("used_at") @db.DateTime(0)
+  requestIp String?  @map("request_ip") @db.VarChar(45)
+  userAgent String?  @map("user_agent") @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(0)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@index([usedAt])
+  @@map("password_reset_tokens")
 }

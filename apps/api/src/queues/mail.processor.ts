@@ -23,6 +23,14 @@ interface BreachNotificationJobData {
   notifyName: string;
 }
 
+interface PasswordResetJobData {
+  to: string;
+  firstName: string | null;
+  lastName: string | null;
+  resetUrl: string;
+  expiresAt: Date;
+}
+
 @Processor(QUEUE_NAMES.MAIL)
 @Injectable()
 export class MailProcessor extends WorkerHost {
@@ -36,7 +44,7 @@ export class MailProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<EscalationJobData>): Promise<{ success: boolean }> {
+  async process(job: Job): Promise<{ success: boolean }> {
     this.logger.log(
       `[Job ${job.id as string}] Processing mail job: ${job.name}`,
     );
@@ -49,6 +57,8 @@ export class MailProcessor extends WorkerHost {
         await this.handleBreachNotificationEmail(
           job.data as BreachNotificationJobData,
         );
+      } else if (job.name === JOB_NAMES.SEND_PASSWORD_RESET_EMAIL) {
+        await this.handlePasswordResetEmail(job.data as PasswordResetJobData);
       }
       return { success: true };
     } catch (error) {
@@ -119,5 +129,15 @@ export class MailProcessor extends WorkerHost {
     `;
 
     await this.mailService.sendEmail(recipientEmail, subject, htmlContent);
+  }
+
+  private async handlePasswordResetEmail(data: PasswordResetJobData) {
+    await this.mailService.sendPasswordResetEmail({
+      to: data.to,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      resetUrl: data.resetUrl,
+      expiresAt: new Date(data.expiresAt),
+    });
   }
 }

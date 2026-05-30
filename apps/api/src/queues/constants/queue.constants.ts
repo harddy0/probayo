@@ -10,6 +10,7 @@ export const JOB_NAMES = {
   UPLOAD_COMMENT_ATTACHMENT: 'upload-comment-attachment',
   SEND_ESCALATION_EMAIL: 'send-escalation-email',
   SEND_BREACH_NOTIFICATION_EMAIL: 'send-breach-notification-email',
+  SEND_PASSWORD_RESET_EMAIL: 'send-password-reset-email',
   SEND_TICKET_CREATED_NOTIFICATION: 'send-ticket-created-notification',
   SEND_TICKET_ASSIGNED_NOTIFICATION: 'send-ticket-assigned-notification',
   SEND_STATUS_CHANGED_NOTIFICATION: 'send-status-changed-notification',
