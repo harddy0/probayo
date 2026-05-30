@@ -97,6 +97,8 @@ model User {
   scheduledReports    ScheduledReport[]
   escalationsNotified EscalationEvent[]     @relation("EscalationNotifiedUser")
   passwordResetTokens PasswordResetToken[]
+  notificationPreferences NotificationPreference[]
+  auditLogs              AuditLog[]
 
   @@map("users")
 }
@@ -348,4 +350,64 @@ model PasswordResetToken {
   @@index([expiresAt])
   @@index([usedAt])
   @@map("password_reset_tokens")
+}
+
+model NotificationPreference {
+  id        String           @id @default(uuid()) @db.Char(36)
+  userId    String           @map("user_id") @db.Char(36)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType @map("type")
+  email     Boolean          @default(false)
+  inApp     Boolean          @default(true) @map("in_app")
+  createdAt DateTime         @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt DateTime         @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+
+  @@unique([userId, type])
+  @@map("notification_preferences")
+}
+
+enum AuditAction {
+  Create  @map("create")
+  Update  @map("update")
+  Delete  @map("delete")
+  View    @map("view")
+  Assign  @map("assign")
+  Unassign @map("unassign")
+  Comment @map("comment")
+  Login   @map("login")
+  Logout  @map("logout")
+  Upload  @map("upload")
+  Download @map("download")
+}
+
+enum AuditEntityType {
+  Ticket         @map("ticket")
+  Comment        @map("comment")
+  Attachment     @map("attachment")
+  User           @map("user")
+  Department     @map("department")
+  KnownIssue     @map("known_issue")
+  SlaPolicy      @map("sla_policy")
+  EscalationRule @map("escalation_rule")
+  Asset          @map("asset")
+  Category       @map("category")
+}
+
+model AuditLog {
+  id         String          @id @default(uuid()) @db.Char(36)
+  actorUserId String         @map("actor_user_id") @db.Char(36)
+  actorUser   User           @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  action     AuditAction     @map("action")
+  entityType AuditEntityType @map("entity_type")
+  entityId   String          @map("entity_id") @db.VarChar(36)
+  metadata   Json?           @map("metadata")
+  ipAddress  String?         @map("ip_address") @db.VarChar(45)
+  userAgent  String?         @map("user_agent") @db.VarChar(255)
+  createdAt  DateTime        @default(now()) @map("created_at") @db.DateTime(0)
+
+  @@index([entityType, entityId])
+  @@index([actorUserId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

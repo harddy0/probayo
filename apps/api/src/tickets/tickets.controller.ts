@@ -9,10 +9,15 @@ import {
   UseGuards,
   Request,
   Query,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -20,6 +25,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
+import type { File as MulterFile } from 'multer';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -30,6 +36,8 @@ import { TicketResponseDto } from './dto/ticket-response.dto';
 import { CreateTicketCommentDto } from './dto/create-comment.dto';
 import { UpdateTicketCommentDto } from './dto/update-comment.dto';
 import { BulkAttachIssueDto } from './dto/bulk-attach-issue.dto';
+import { BulkAssignDto } from './dto/bulk-assign.dto';
+import { BulkStatusDto } from './dto/bulk-status.dto';
 import { TicketPageResponseDto } from './dto/ticket-page-response.dto';
 
 @ApiTags('tickets')
@@ -160,6 +168,77 @@ export class TicketsController {
       bulkAttachIssueDto.ticketIds,
       bulkAttachIssueDto.knownIssueId,
     );
+  }
+
+  @Post('bulk/assign')
+  @Roles(UserRole.Admin, UserRole.ItStaff)
+  @UseGuards(RolesGuard)
+  @ApiOperation({
+    summary: 'Bulk assign tickets to a user',
+    description:
+      'Assign multiple tickets to the same user in one operation. Admin/IT only.',
+  })
+  @ApiBody({ type: BulkAssignDto })
+  @ApiResponse({ status: 200, description: 'Tickets assigned successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin/IT only' })
+  bulkAssign(
+    @Body() dto: BulkAssignDto,
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.ticketsService.bulkAssign(dto.ticketIds, dto.assignToUserId, req.user.id);
+  }
+
+  @Post('bulk/status')
+  @Roles(UserRole.Admin, UserRole.ItStaff)
+  @UseGuards(RolesGuard)
+  @ApiOperation({
+    summary: 'Bulk update ticket status',
+    description:
+      'Change the status of multiple tickets in one operation. Admin/IT only.',
+  })
+  @ApiBody({ type: BulkStatusDto })
+  @ApiResponse({ status: 200, description: 'Ticket statuses updated successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin/IT only' })
+  bulkStatus(
+    @Body() dto: BulkStatusDto,
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.ticketsService.bulkStatus(dto.ticketIds, dto.status, req.user.id);
+  }
+
+  @Post(':id/attach')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({
+    summary: 'Upload an attachment to a ticket',
+    description:
+      'Attach a file to an existing ticket. Supports images, PDFs, documents, and more.',
+  })
+  @ApiParam({ name: 'id', description: 'Ticket UUID' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'File to attach (max 10MB)',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: 'File attached successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid file or validation failed' })
+  @ApiResponse({ status: 404, description: 'Ticket not found' })
+  async attachFile(
+    @Param('id') id: string,
+    @Request() req: { user: { id: string } },
+    @UploadedFile() file: MulterFile,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+    return this.ticketsService.attachFile(id, req.user.id, file);
   }
 
   @Post(':id/assign/:userId')

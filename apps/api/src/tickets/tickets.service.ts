@@ -3,7 +3,10 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Inject,
+  Logger,
 } from '@nestjs/common';
+import type { File as MulterFile } from 'multer';
 import { PrismaService } from '../prisma/prisma.service';
 import { SlaService } from '../sla/sla.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
@@ -16,9 +19,13 @@ import {
   Prisma,
   TicketStatus,
   UserRole,
+  AuditAction,
+  AuditEntityType,
 } from '@prisma/client';
 import { CommentsService } from '../comments/comments.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import type { IStorageService } from '../attachments/storage/storage.interface';
 
 type TicketActor = {
   id: string;
@@ -35,11 +42,15 @@ type TicketListQuery = Prisma.TicketWhereInput & {
 
 @Injectable()
 export class TicketsService {
+  private readonly logger = new Logger(TicketsService.name);
+
   constructor(
     private prisma: PrismaService,
     private slaService: SlaService,
     private notificationsService: NotificationsService,
     private commentsService: CommentsService,
+    private auditLogsService: AuditLogsService,
+    @Inject('IStorageService') private storage: IStorageService,
   ) {}
 
   // ==================== CREATE TICKET ====================
@@ -142,6 +153,19 @@ export class TicketsService {
       departmentName,
       ticket.priority,
     );
+
+    // 9. Record audit log (async, non-blocking)
+    void this.auditLogsService.record({
+      actorUserId: userId,
+      action: AuditAction.Create,
+      entityType: AuditEntityType.Ticket,
+      entityId: ticket.id,
+      metadata: {
+        title: ticket.title,
+        priority: ticket.priority,
+        status: ticket.status,
+      },
+    });
 
     return ticket;
   }
@@ -304,6 +328,14 @@ export class TicketsService {
         'You do not have permission to view this ticket',
       );
     }
+
+    // Record view audit log (async, non-blocking)
+    void this.auditLogsService.record({
+      actorUserId: userId,
+      action: AuditAction.View,
+      entityType: AuditEntityType.Ticket,
+      entityId: id,
+    });
 
     return ticket;
   }
@@ -736,7 +768,23 @@ export class TicketsService {
       );
     }
 
-    // 10. Check for SLA breaches after update
+    // 10. Record audit log for update (async, non-blocking)
+    void this.auditLogsService.record({
+      actorUserId: userId,
+      action: AuditAction.Update,
+      entityType: AuditEntityType.Ticket,
+      entityId: id,
+      metadata: {
+        changes: {
+          ...(statusChanged ? { fromStatus: oldStatus, toStatus: newStatus } : {}),
+          ...(isAssigning && assignedToUserForNotification
+            ? { assignedToUserId: assignedToUserForNotification.id }
+            : {}),
+        },
+      },
+    });
+
+    // 11. Check for SLA breaches after update
     await this.slaService.updateBreachStatus(id);
 
     return updatedTicket;
@@ -766,13 +814,27 @@ export class TicketsService {
     }
 
     // Soft delete by marking as closed
-    return this.prisma.ticket.update({
+    const result = await this.prisma.ticket.update({
       where: { id },
       data: {
         status: TicketStatus.Closed,
         closedAt: new Date(),
       },
     });
+
+    // Record audit log (async, non-blocking)
+    void this.auditLogsService.record({
+      actorUserId: userId,
+      action: AuditAction.Delete,
+      entityType: AuditEntityType.Ticket,
+      entityId: id,
+      metadata: {
+        closed: true,
+        previousStatus: ticket.status,
+      },
+    });
+
+    return result;
   }
 
   // ==================== ASSIGN TICKET ====================
@@ -858,6 +920,18 @@ export class TicketsService {
       assigneeName,
     );
 
+    // Record audit log (async, non-blocking)
+    void this.auditLogsService.record({
+      actorUserId: actorUserId,
+      action: AuditAction.Assign,
+      entityType: AuditEntityType.Ticket,
+      entityId: id,
+      metadata: {
+        assignedToUserId,
+        assignedToUserEmail: assignedToUser.email,
+      },
+    });
+
     return updatedTicket;
   }
 
@@ -896,10 +970,261 @@ export class TicketsService {
       throw new ForbiddenException('IT staff can only unassign themselves');
     }
 
-    return this.prisma.ticket.update({
+    const result = await this.prisma.ticket.update({
       where: { id },
       data: { assignedToUserId: null },
     });
+
+    // Record audit log (async, non-blocking)
+    void this.auditLogsService.record({
+      actorUserId: actorUserId,
+      action: AuditAction.Unassign,
+      entityType: AuditEntityType.Ticket,
+      entityId: id,
+      metadata: {
+        previouslyAssignedToUserId: ticket.assignedToUserId,
+      },
+    });
+
+    return result;
+  }
+
+  // ==================== BULK ASSIGN ====================
+  async bulkAssign(
+    ticketIds: string[],
+    assignToUserId: string,
+    actorUserId: string,
+  ) {
+    const actor = await this.prisma.user.findUnique({
+      where: { id: actorUserId },
+    });
+
+    if (!actor) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (actor.role !== UserRole.Admin && actor.role !== UserRole.ItStaff) {
+      throw new ForbiddenException(
+        'Only admins and IT staff can assign tickets',
+      );
+    }
+
+    const assignedToUser = await this.prisma.user.findUnique({
+      where: { id: assignToUserId },
+    });
+
+    if (!assignedToUser) {
+      throw new NotFoundException(`User ${assignToUserId} not found`);
+    }
+
+    if (assignedToUser.role !== UserRole.ItStaff) {
+      throw new BadRequestException('Tickets can only be assigned to IT staff');
+    }
+
+    if (actor.role === UserRole.Admin && actor.id === assignToUserId) {
+      throw new ForbiddenException('Admins cannot self-assign tickets');
+    }
+
+    if (actor.role === UserRole.ItStaff && actor.id !== assignToUserId) {
+      throw new ForbiddenException('IT staff can only self-assign tickets');
+    }
+
+    const tickets = await this.prisma.ticket.findMany({
+      where: {
+        id: { in: ticketIds },
+        status: { not: TicketStatus.Closed },
+      },
+    });
+
+    if (tickets.length === 0) {
+      throw new BadRequestException('No eligible tickets found for assignment');
+    }
+
+    const skipped = ticketIds.length - tickets.length;
+
+    await this.prisma.ticket.updateMany({
+      where: { id: { in: tickets.map((t) => t.id) } },
+      data: { assignedToUserId: assignToUserId },
+    });
+
+    // Record audit logs for each assigned ticket (async, non-blocking)
+    for (const ticket of tickets) {
+      void this.auditLogsService.record({
+        actorUserId: actorUserId,
+        action: AuditAction.Assign,
+        entityType: AuditEntityType.Ticket,
+        entityId: ticket.id,
+        metadata: {
+          assignToUserId,
+          bulkOperation: true,
+        },
+      });
+    }
+
+    return {
+      message: `Bulk assignment completed. ${tickets.length} ticket(s) assigned.${skipped > 0 ? ` ${skipped} ticket(s) skipped (closed).` : ''}`,
+      assignedCount: tickets.length,
+      skippedCount: skipped,
+    };
+  }
+
+  // ==================== BULK STATUS ====================
+  async bulkStatus(
+    ticketIds: string[],
+    status: TicketStatus,
+    actorUserId: string,
+  ) {
+    const actor = await this.prisma.user.findUnique({
+      where: { id: actorUserId },
+    });
+
+    if (!actor) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (actor.role !== UserRole.Admin && actor.role !== UserRole.ItStaff) {
+      throw new ForbiddenException(
+        'Only admins and IT staff can update ticket statuses in bulk',
+      );
+    }
+
+    const tickets = await this.prisma.ticket.findMany({
+      where: { id: { in: ticketIds } },
+    });
+
+    if (tickets.length === 0) {
+      throw new BadRequestException('No tickets found');
+    }
+
+    let updatedCount = 0;
+    const errors: Array<{ ticketId: string; error: string }> = [];
+
+    for (const ticket of tickets) {
+      try {
+        this.validateStatusTransition(ticket.status, status, actor.role);
+
+        const updateData: Prisma.TicketUncheckedUpdateInput = {
+          status,
+        };
+
+        if (status === TicketStatus.Acknowledged && !ticket.acknowledgedAt) {
+          updateData.acknowledgedAt = new Date();
+        }
+        if (status === TicketStatus.Resolved && !ticket.resolvedAt) {
+          updateData.resolvedAt = new Date();
+        }
+        if (status === TicketStatus.Closed && !ticket.closedAt) {
+          updateData.closedAt = new Date();
+        }
+
+        await this.prisma.ticket.update({
+          where: { id: ticket.id },
+          data: updateData as Prisma.TicketUpdateInput,
+        });
+
+        await this.recordStatusHistory(
+          ticket.id,
+          ticket.status,
+          status,
+          actorUserId,
+        );
+
+        // Record audit log for status change (async, non-blocking)
+        void this.auditLogsService.record({
+          actorUserId: actorUserId,
+          action: AuditAction.Update,
+          entityType: AuditEntityType.Ticket,
+          entityId: ticket.id,
+          metadata: {
+            changes: {
+              fromStatus: ticket.status,
+              toStatus: status,
+            },
+            bulkOperation: true,
+          },
+        });
+
+        updatedCount++;
+      } catch (error) {
+        errors.push({
+          ticketId: ticket.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
+    return {
+      message: `Status updated for ${updatedCount} of ${ticketIds.length} ticket(s)`,
+      updatedCount,
+      totalRequested: ticketIds.length,
+      errors: errors.length > 0 ? errors : undefined,
+    };
+  }
+
+  // ==================== INLINE FILE ATTACHMENT ====================
+  async attachFile(
+    ticketId: string,
+    userId: string,
+    file: MulterFile,
+  ) {
+    // Verify ticket exists and user has permission
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException(`Ticket ${ticketId} not found`);
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.role === UserRole.DepartmentHead) {
+      throw new ForbiddenException('Department heads cannot upload attachments');
+    }
+
+    // Generate unique filename and save file to storage
+    const filePath = await this.storage.save(file, ticketId);
+
+    // Create attachment record with the real storage path
+    const attachment = await this.prisma.ticketAttachment.create({
+      data: {
+        ticketId,
+        uploadedByUserId: userId,
+        fileName: file.originalname,
+        fileType: file.mimetype,
+        fileSizeBytes: file.size,
+        fileUrlOrPath: filePath,
+      },
+    });
+
+    // Record audit log (async, non-blocking)
+    void this.auditLogsService.record({
+      actorUserId: userId,
+      action: AuditAction.Upload,
+      entityType: AuditEntityType.Attachment,
+      entityId: attachment.id,
+      metadata: {
+        ticketId,
+        fileName: file.originalname,
+        fileType: file.mimetype,
+        fileSizeBytes: file.size,
+      },
+    });
+
+    return {
+      id: attachment.id,
+      fileName: attachment.fileName,
+      fileType: attachment.fileType,
+      fileSizeBytes: attachment.fileSizeBytes,
+      ticketId: attachment.ticketId,
+      message: 'File attached successfully',
+    };
   }
 
   // ==================== BULK ATTACH TO KNOWN ISSUE ====================
