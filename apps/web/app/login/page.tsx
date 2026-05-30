@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import Link from "next/link";
 import { ArrowRight, LockKeyhole, Mail } from "lucide-react";
 import { login } from "@/lib/api/auth";
 import { getAuthSession } from "@/lib/api/client";
@@ -193,12 +194,12 @@ export default function LoginPage() {
                     <Label htmlFor="password" className="text-sm font-medium text-zinc-300">
                       Password
                     </Label>
-                    <button
-                      type="button"
+                    <Link
+                      href="/forgot-password"
                       className="text-xs text-zinc-500 transition hover:text-zinc-300"
                     >
                       Forgot password?
-                    </button>
+                    </Link>
                   </div>
                   <div className="relative">
                     <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />

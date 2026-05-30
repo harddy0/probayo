@@ -36,20 +36,31 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
+    if (!this.isNonEmptyString(email)) {
+      throw new BadRequestException('Email is required');
+    }
+
+    if (!this.isNonEmptyString(password)) {
+      throw new BadRequestException('Password is required');
+    }
+
     const user = await this.usersService.findByEmail(email);
 
     if (!user) {
-      return null;
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     if (user.isActive !== true) {
       throw new UnauthorizedException('User account is inactive');
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    const isPasswordValid = await this.comparePassword(
+      password,
+      user.passwordHash,
+    );
 
     if (!isPasswordValid) {
-      return null;
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     // Return user without password hash
@@ -102,13 +113,17 @@ export class AuthService {
     currentPassword: string,
     newPassword: string,
   ): Promise<{ message: string }> {
+    if (!this.isNonEmptyString(currentPassword)) {
+      throw new BadRequestException('Current password is required');
+    }
+
     const user = await this.usersService.findOne(userId);
 
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
 
-    const isPasswordValid = await bcrypt.compare(
+    const isPasswordValid = await this.comparePassword(
       currentPassword,
       user.passwordHash,
     );
@@ -117,8 +132,7 @@ export class AuthService {
       throw new UnauthorizedException('Current password is incorrect');
     }
 
-    const saltRounds = 10;
-    const hashedValue = await bcrypt.hash(newPassword, saltRounds);
+    const hashedValue = await this.hashPassword(newPassword);
     await this.usersService.updatePasswordHash(userId, hashedValue);
 
     return { message: 'Password updated successfully' };
@@ -196,6 +210,10 @@ export class AuthService {
     newPassword: string,
     confirmPassword: string,
   ): Promise<{ message: string }> {
+    if (!this.isNonEmptyString(token)) {
+      throw new BadRequestException('Reset token is required');
+    }
+
     if (newPassword !== confirmPassword) {
       throw new BadRequestException('Passwords do not match');
     }
@@ -215,8 +233,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired token');
     }
 
-    const saltRounds = 10;
-    const hashedValue = await bcrypt.hash(newPassword, saltRounds);
+    const hashedValue = await this.hashPassword(newPassword);
 
     await this.prisma.$transaction([
       this.prisma.passwordResetToken.update({
@@ -234,6 +251,57 @@ export class AuthService {
 
   private hashToken(token: string): string {
     return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
+  private async comparePassword(
+    password: string,
+    passwordHash: string | null,
+  ): Promise<boolean> {
+    if (
+      !this.isNonEmptyString(password) ||
+      !this.isNonEmptyString(passwordHash)
+    ) {
+      return false;
+    }
+
+    try {
+      return await bcrypt.compare(password, passwordHash);
+    } catch (error) {
+      this.logger.warn(
+        `Password comparison failed: ${(error as Error).message}`,
+      );
+      return false;
+    }
+  }
+
+  private async hashPassword(password: string): Promise<string> {
+    if (!this.isNonEmptyString(password)) {
+      throw new BadRequestException('Password is required');
+    }
+
+    const saltRounds = this.getSaltRounds();
+
+    try {
+      return await bcrypt.hash(password, saltRounds);
+    } catch (error) {
+      this.logger.error(`Password hashing failed: ${(error as Error).message}`);
+      throw new BadRequestException('Invalid password');
+    }
+  }
+
+  private getSaltRounds(): number {
+    const rawValue = this.configService.get('BCRYPT_SALT_ROUNDS');
+    const saltRounds = Number(rawValue);
+
+    if (!Number.isFinite(saltRounds) || saltRounds < 8) {
+      return 10;
+    }
+
+    return saltRounds;
+  }
+
+  private isNonEmptyString(value: unknown): value is string {
+    return typeof value === 'string' && value.trim().length > 0;
   }
 
   private getResetTokenTtlMinutes(): number {
