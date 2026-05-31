@@ -22,6 +22,7 @@ export {
   fetchUnreadCount,
   markNotificationSeen,
   markNotificationsSeen,
+  markAllNotificationsSeen,
 } from "./notifications";
 
 // ── Tickets ──

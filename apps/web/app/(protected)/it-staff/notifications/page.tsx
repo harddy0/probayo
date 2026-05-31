@@ -19,7 +19,7 @@ import { isApiError } from "@/lib/api/client";
 import {
   fetchNotifications,
   markNotificationSeen,
-  markNotificationsSeen,
+  markAllNotificationsSeen,
 } from "@/lib/api/notifications";
 import type { Notification, NotificationType } from "@/lib/types/notifications";
 import { cn } from "@/lib/utils";
@@ -177,8 +177,7 @@ export default function ItStaffNotificationsPage() {
   const handleMarkAllAsRead = async () => {
     setIsMarkingAll(true);
     try {
-      const unreadIds = notifications.filter((n) => !n.isSeen).map((n) => n.id);
-      await markNotificationsSeen(unreadIds);
+      await markAllNotificationsSeen();
       setNotifications((prev) => prev.map((n) => ({ ...n, isSeen: true })));
     } catch (err) {
       setError(isApiError(err) ? err.message : "Failed to mark all as read.");

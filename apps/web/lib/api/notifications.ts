@@ -43,3 +43,14 @@ export const markNotificationsSeen = async (ids: string[]): Promise<void> => {
   if (ids.length === 0) return;
   await Promise.all(ids.map((id) => markNotificationSeen(id)));
 };
+
+/**
+ * Mark ALL notifications as seen for the current user in a single request.
+ *
+ * Uses the backend bulk endpoint instead of marking notifications one-by-one.
+ */
+export const markAllNotificationsSeen = async (): Promise<void> => {
+  await request<void>("/notifications/read-all", {
+    method: "PUT",
+  });
+};
