@@ -10,11 +10,16 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { ActiveUserGuard } from './guards/active-user.guard';
+import { PrismaModule } from '../prisma/prisma.module';
+import { BullModule } from '@nestjs/bullmq';
+import { QUEUE_NAMES } from '../queues/constants/queue.constants';
 
 @Module({
   imports: [
     forwardRef(() => UsersModule),
     ConfigModule,
+    PrismaModule,
+    BullModule.registerQueue({ name: QUEUE_NAMES.MAIL }),
     PassportModule,
     JwtModule.registerAsync({
       inject: [ConfigService],

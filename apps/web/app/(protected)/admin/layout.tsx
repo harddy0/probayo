@@ -8,6 +8,7 @@ import {
   Building2,
   HardDrive,
   LayoutDashboard,
+  ShieldAlert,
   ShieldCheck,
   Tags,
   TicketCheck,
@@ -23,6 +24,7 @@ import AppShell, { type NavItem } from "@/components/layout/app-shell";
 const navItems: NavItem[] = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/departments", label: "Departments", icon: Building2 },
+  { href: "/admin/audit-logs", label: "Audit Logs", icon: ShieldAlert },
   { href: "/admin/ticket-categories", label: "Ticket Categories", icon: Tags },
   { href: "/admin/known-issues", label: "Known Issues", icon: AlertTriangle },
   { href: "/admin/tickets", label: "Tickets", icon: TicketCheck },

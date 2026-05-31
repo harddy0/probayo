@@ -7,7 +7,15 @@
  */
 
 import { clearAuthSession, request, setAuthSession } from "./client";
-import type { AuthIdentity, AuthSummary, ChangePasswordPayload, LoginResponse, UserProfile } from "../types/auth";
+import type {
+  AuthIdentity,
+  AuthSummary,
+  ChangePasswordPayload,
+  LoginResponse,
+  PasswordResetConfirmPayload,
+  PasswordResetRequestPayload,
+  UserProfile,
+} from "../types/auth";
 
 /**
  * Login user with email and password
@@ -83,5 +91,46 @@ export const changePassword = async (
   await request("/auth/change-password", {
     method: "POST",
     body: payload,
+  });
+};
+
+/**
+ * Request a password reset email
+ *
+ * Sends a password reset request to the backend.
+ * The backend handles email delivery with the reset token/link.
+ * No auth required.
+ *
+ * @param payload - Object containing the user's email
+ * @throws ApiError if the request fails
+ */
+export const requestPasswordReset = async (
+  payload: PasswordResetRequestPayload,
+): Promise<void> => {
+  await request("/auth/password-reset/request", {
+    method: "POST",
+    body: payload,
+  });
+};
+
+/**
+ * Confirm a password reset with token and new password
+ *
+ * Submits the reset token (from email link) and the new password.
+ * No auth required.
+ *
+ * @param payload - Object containing the token and new password
+ * @throws ApiError if token is invalid/expired or passwords validation fails
+ */
+export const confirmPasswordReset = async (
+  payload: PasswordResetConfirmPayload,
+): Promise<void> => {
+  await request("/auth/password-reset/confirm", {
+    method: "POST",
+    body: {
+      token: payload.token,
+      newPassword: payload.newPassword,
+      confirmPassword: payload.confirmPassword,
+    },
   });
 };

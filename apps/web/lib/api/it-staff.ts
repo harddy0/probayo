@@ -25,6 +25,7 @@ export {
   fetchUnreadCount,
   markNotificationSeen,
   markNotificationsSeen,
+  markAllNotificationsSeen,
 } from "./notifications";
 
 // ── Ticket Queue (IT Staff View) ──

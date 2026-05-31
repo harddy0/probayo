@@ -8,6 +8,7 @@ import {
   Layers,
   Monitor,
   Settings,
+  ShieldAlert,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -66,6 +67,15 @@ const links = [
     accent: "text-indigo-400",
     border: "border-indigo-500/20",
     bg: "bg-indigo-500/10",
+  },
+  {
+    href: "/admin/audit-logs",
+    label: "Audit Logs",
+    description: "Review system-wide activity trail.",
+    icon: ShieldAlert,
+    accent: "text-rose-400",
+    border: "border-rose-500/20",
+    bg: "bg-rose-500/10",
   },
   {
     href: "/admin/profile",

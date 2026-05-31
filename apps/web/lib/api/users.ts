@@ -6,25 +6,7 @@
 
 import { request } from "./client";
 import type { UserProfile } from "../types/auth";
-
-export type SimpleUser = {
-  id: string;
-  email: string;
-  firstName?: string;
-  lastName?: string;
-  role: string;
-  isActive: boolean;
-  departmentId?: string | null;
-};
-
-export type UpdateUserProfilePayload = {
-  firstName?: string;
-  lastName?: string;
-};
-
-export type UpdateUserStatusPayload = {
-  isActive: boolean;
-};
+import type { CreateUserPayload, SimpleUser, UpdateUserProfilePayload, UpdateUserStatusPayload } from "../types/users";
 
 export const fetchAllUsers = async (): Promise<SimpleUser[]> => {
   return request<SimpleUser[]>("/users");
@@ -63,21 +45,6 @@ export const resetUserPassword = async (userId: string): Promise<void> => {
     method: "POST",
   });
 };
-
-/**
- * Payload for creating a new user.
- * Matches the backend's CreateUserDto schema.
- */
-export type CreateUserPayload = {
-  email: string;
-  passwordHash: string;
-  firstName: string;
-  lastName: string;
-  role: "Admin" | "ItStaff" | "Employee" | "DepartmentHead";
-  departmentId?: string | null;
-  isActive?: boolean;
-};
-
 /**
  * Create a new user.
  * Calls POST /users with the user data.

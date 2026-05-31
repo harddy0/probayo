@@ -58,7 +58,8 @@ import type {
   TicketStatus,
 } from "@/lib/types/tickets";
 import type { KnownIssue } from "@/lib/types/known-issues";
-import { fetchAllUsers, type SimpleUser } from "@/lib/api/users";
+import { fetchAllUsers } from "@/lib/api/users";
+import type { SimpleUser } from "@/lib/types/users";
 import CreateKnownIssueModal from "@/components/known-issues/create-known-issue-modal";
 import BatchAttachModal from "@/components/it-staff/batch-attach-modal";
 import ImageLightbox from "@/components/tickets/image-lightbox";

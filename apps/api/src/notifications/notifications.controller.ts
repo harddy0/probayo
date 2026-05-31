@@ -4,11 +4,14 @@ import {
   Get,
   Param,
   Put,
+  Patch,
+  Body,
   UseGuards,
   Request,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOperation,
   ApiParam,
   ApiResponse,
@@ -17,6 +20,8 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { NotificationsService } from './notifications.service';
 import { NotificationResponseDto } from './dto/notification-response.dto';
+import { NotificationPreferenceResponseDto } from './dto/notification-preference-response.dto';
+import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 
 @ApiTags('notifications')
 @ApiBearerAuth()
@@ -89,5 +94,44 @@ export class NotificationsController {
     @Request() req: { user: { id: string } },
   ) {
     return this.notificationsService.markAsSeen(id, req.user.id);
+  }
+
+  @Put('read-all')
+  @ApiOperation({ summary: 'Mark all notifications as seen for current user' })
+  @ApiResponse({
+    status: 200,
+    description: 'All notifications marked as seen',
+  })
+  markAllAsSeen(@Request() req: { user: { id: string } }) {
+    return this.notificationsService.markAllAsSeen(req.user.id);
+  }
+
+  @Get('preferences')
+  @ApiOperation({ summary: 'Get notification preferences for current user' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns all notification preferences',
+    type: [NotificationPreferenceResponseDto],
+  })
+  getPreferences(@Request() req: { user: { id: string } }) {
+    return this.notificationsService.getPreferences(req.user.id);
+  }
+
+  @Patch('preferences')
+  @ApiOperation({ summary: 'Update notification preferences for current user' })
+  @ApiBody({ type: UpdateNotificationPreferencesDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Notification preferences updated',
+    type: [NotificationPreferenceResponseDto],
+  })
+  updatePreferences(
+    @Request() req: { user: { id: string } },
+    @Body() dto: UpdateNotificationPreferencesDto,
+  ) {
+    return this.notificationsService.updatePreferences(
+      req.user.id,
+      dto.preferences,
+    );
   }
 }

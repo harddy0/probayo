@@ -39,3 +39,13 @@ export type ChangePasswordPayload = {
   currentPassword: string;
   newPassword: string;
 };
+
+export type PasswordResetRequestPayload = {
+  email: string;
+};
+
+export type PasswordResetConfirmPayload = {
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
+};

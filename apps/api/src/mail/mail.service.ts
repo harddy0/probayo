@@ -60,4 +60,33 @@ export class MailService {
 
     return data;
   }
+
+  async sendPasswordResetEmail(input: {
+    to: string;
+    firstName: string | null;
+    lastName: string | null;
+    resetUrl: string;
+    expiresAt: Date;
+  }) {
+    const displayName = [input.firstName, input.lastName]
+      .filter(Boolean)
+      .join(' ');
+    const greeting = displayName ? `Hi ${displayName},` : 'Hello,';
+    const expiresAt = input.expiresAt.toUTCString();
+
+    const subject = 'Reset your password';
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+        <p>${greeting}</p>
+        <p>We received a request to reset your password.</p>
+        <p>
+          <a href="${input.resetUrl}">Click here to reset your password</a>
+        </p>
+        <p>This link expires at ${expiresAt} UTC.</p>
+        <p>If you did not request this, you can safely ignore this email.</p>
+      </div>
+    `;
+
+    return this.sendEmail(input.to, subject, htmlContent);
+  }
 }

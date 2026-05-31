@@ -204,6 +204,78 @@ export class NotificationsService {
     });
   }
 
+  async markAllAsSeen(userId: string) {
+    await this.prisma.notification.updateMany({
+      where: {
+        recipientUserId: userId,
+        isSeen: false,
+      },
+      data: {
+        isSeen: true,
+      },
+    });
+
+    return {
+      message: 'All notifications marked as seen',
+    };
+  }
+
+  async getPreferences(userId: string) {
+    // Get all notification types
+    const allTypes = Object.values(NotificationType);
+
+    // Get existing preferences for this user
+    const existingPrefs = await this.prisma.notificationPreference.findMany({
+      where: { userId },
+    });
+
+    const prefMap = new Map(existingPrefs.map((p) => [p.type, p]));
+
+    // Build full preferences list (use defaults for missing types)
+    return allTypes.map((type) => {
+      const existing = prefMap.get(type);
+      return {
+        id: existing?.id ?? null,
+        type,
+        email: existing?.email ?? false,
+        inApp: existing?.inApp ?? true,
+        updatedAt: existing?.updatedAt ?? null,
+      };
+    });
+  }
+
+  async updatePreferences(
+    userId: string,
+    preferences: Array<{
+      type: NotificationType;
+      email: boolean;
+      inApp: boolean;
+    }>,
+  ) {
+    for (const pref of preferences) {
+      await this.prisma.notificationPreference.upsert({
+        where: {
+          userId_type: {
+            userId,
+            type: pref.type,
+          },
+        },
+        create: {
+          userId,
+          type: pref.type,
+          email: pref.email,
+          inApp: pref.inApp,
+        },
+        update: {
+          email: pref.email,
+          inApp: pref.inApp,
+        },
+      });
+    }
+
+    return this.getPreferences(userId);
+  }
+
   async findITStaff(): Promise<
     Array<{
       id: string;

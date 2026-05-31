@@ -26,6 +26,7 @@ import { AppService } from './app.service';
 import { NotificationsModule } from './notifications/notifications.module';
 import { KnownIssuesModule } from './known-issues/known-issues.module';
 import { DepartmentHeadModule } from './department-head/department-head.module';
+import { AuditLogsModule } from './audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -46,6 +47,9 @@ import { DepartmentHeadModule } from './department-head/department-head.module';
         RESEND_API_KEY: Joi.string().required(),
         EMAIL_FROM_ADDRESS: Joi.string().email().required(),
         EMAIL_FROM_NAME: Joi.string().required(),
+        RESET_TOKEN_TTL_MINUTES: Joi.number().optional(),
+        FRONTEND_BASE_URL: Joi.string().optional(),
+        RESET_TOKEN_USED_RETENTION_DAYS: Joi.number().optional(),
       }),
     }),
 
@@ -107,6 +111,7 @@ import { DepartmentHeadModule } from './department-head/department-head.module';
     NotificationsModule,
     KnownIssuesModule,
     DepartmentHeadModule,
+    AuditLogsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
