@@ -28,7 +28,8 @@ export class HealthController {
         this.filesQueue.getDelayedCount(),
       ]);
 
-      const isRedisConnected = await (await this.filesQueue.client).ping();
+      const redisClient = await this.filesQueue.client;
+      const isRedisConnected = await (redisClient as any).ping();
 
       return {
         status: 'healthy',
