@@ -9,19 +9,34 @@ import {
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import 'dotenv/config';
 
+/** Matches mariadb SSL options (boolean or object with ca/cert/key/rejectUnauthorized) */
+type SslOption =
+  | boolean
+  | {
+      ca?: string | string[];
+      cert?: string | string[];
+      key?: string | string[];
+      ciphers?: string;
+      rejectUnauthorized?: boolean;
+      checkServerIdentity?: (host: string, cert: object) => Error | undefined;
+    };
+
 const dbUrl = process.env['DATABASE_URL'];
+const rawDatabaseSsl = process.env['DATABASE_SSL'];
 
 if (!dbUrl) {
   throw new Error('DATABASE_URL is missing');
 }
 
 const url = new URL(dbUrl);
+const ssl = resolveSeedSsl(url, rawDatabaseSsl);
 const adapter = new PrismaMariaDb({
   host: url.hostname,
   port: Number(url.port || 3306),
   user: decodeURIComponent(url.username),
   password: decodeURIComponent(url.password),
   database: url.pathname.replace(/^\//, ''),
+  ssl,
 });
 
 const prisma = new PrismaClient({
@@ -359,6 +374,84 @@ async function main() {
   console.log('   itstaff@itstaff.com           → IT Staff');
   console.log('   employee@employee.com         → Employee');
   console.log('   departmenthead@departmenthead.com → Department Head');
+}
+
+function resolveSeedSsl(url: URL, envSsl?: string): SslOption {
+  const host = url.hostname.toLowerCase();
+  const isTiDb = host.includes('tidbcloud.com');
+
+  if (envSsl !== undefined) {
+    const enabled = envSsl === 'true' || envSsl === '1';
+    return enabled ? { rejectUnauthorized: true } : false;
+  }
+
+  const sslParam = url.searchParams.get('ssl');
+  if (sslParam !== null) {
+    const trimmed = sslParam.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed) as SslOption;
+        if (parsed === false && isTiDb) {
+          // Ignore explicit disable for TiDB Cloud
+        } else {
+          return parsed;
+        }
+      } catch {
+        // Invalid JSON - fall through to boolean check
+      }
+    }
+
+    if (sslParam === 'true' || sslParam === '1') {
+      return { rejectUnauthorized: true };
+    }
+    if (!isTiDb) return false;
+  }
+
+  const sslAccept = url.searchParams.get('sslaccept');
+  if (sslAccept !== null) {
+    const normalized = sslAccept.toLowerCase();
+    if (
+      normalized === 'strict' ||
+      normalized === 'required' ||
+      normalized === 'verify-full' ||
+      normalized === 'verify-identity' ||
+      normalized === 'true' ||
+      normalized === '1'
+    ) {
+      return { rejectUnauthorized: true };
+    }
+    if (normalized === 'preferred' || normalized === 'prefer') {
+      return isTiDb ? { rejectUnauthorized: true } : true;
+    }
+    if (
+      normalized === 'disabled' ||
+      normalized === 'false' ||
+      normalized === '0'
+    ) {
+      if (!isTiDb) return false;
+    }
+  }
+
+  const sslMode = url.searchParams.get('sslmode');
+  if (sslMode !== null) {
+    switch (sslMode.toLowerCase()) {
+      case 'require':
+      case 'verify-full':
+      case 'verify-identity':
+        return { rejectUnauthorized: true };
+      case 'prefer':
+        return isTiDb ? { rejectUnauthorized: true } : true;
+      case 'disable':
+        if (!isTiDb) return false;
+        break;
+      default:
+        if (!isTiDb) return false;
+        break;
+    }
+  }
+
+  if (isTiDb) return { rejectUnauthorized: true };
+  return false;
 }
 
 main()
