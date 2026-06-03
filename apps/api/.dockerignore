@@ -1,0 +1,55 @@
+# ============================================================
+# .dockerignore — Exclude build context bloat
+# ============================================================
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build outputs
+dist
+.next
+build
+.cache
+.turbo
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE & editor
+.idea
+.vscode
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test coverage
+coverage
+
+# Temp files
+tmp
+temp
+*.tsbuildinfo
+
+# OS files
+Thumbs.db
+Desktop.ini
+
+# Uploaded files (local storage)
+uploads/
+uploads/*

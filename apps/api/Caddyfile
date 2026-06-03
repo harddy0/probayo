@@ -1,0 +1,45 @@
+# ============================================================
+# Caddyfile — Reverse proxy for Probayo API
+# ============================================================
+# Caddy automatically handles SSL (Let's Encrypt) for you.
+# No manual cert management needed.
+#
+# Setup:
+#   1. Install Caddy on your VPS: https://caddyserver.com/docs/install
+#   2. Replace 'api.yourdomain.com' with your actual domain
+#   3. Copy this file to /etc/caddy/Caddyfile on your VPS
+#   4. Run: systemctl restart caddy
+#
+# If you don't have a domain yet, use your VPS IP address:
+#   :80 {
+#       reverse_proxy localhost:3001
+#   }
+# ============================================================
+
+api.yourdomain.com {
+    # Proxy all requests to the NestJS API running in Docker
+    reverse_proxy localhost:3001
+
+    # Security headers
+    header / {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    # Increase upload limit for file attachments (default is 10MB in NestJS)
+    # Caddy's default request body limit is ~50MB, which is fine for 10MB uploads
+
+    # Logs
+    log {
+        output file /var/log/caddy/api.access.log
+    }
+}
+
+# ── Optional: Health check endpoint ──────────────────────────
+# You can also proxy health checks without auth requirements
+# api.yourdomain.com/health {
+#     reverse_proxy localhost:3001/health
+# }

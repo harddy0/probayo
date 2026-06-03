@@ -23,6 +23,10 @@ export class S3StorageService implements IStorageService {
     const secretAccessKey = this.configService.get<string>(
       'AWS_SECRET_ACCESS_KEY',
     );
+    const endpoint = this.configService.get<string>('AWS_S3_ENDPOINT');
+    const forcePathStyle = this.configService.get<string>(
+      'AWS_S3_FORCE_PATH_STYLE',
+    );
 
     const s3Config: S3ClientConfig = {};
     if (region) s3Config.region = region;
@@ -30,6 +34,14 @@ export class S3StorageService implements IStorageService {
       // both credentials present — set them
 
       s3Config.credentials = { accessKeyId, secretAccessKey };
+    }
+    if (endpoint) {
+      // Support S3-compatible providers (Cloudflare R2, MinIO, etc.)
+      s3Config.endpoint = endpoint;
+    }
+    if (typeof forcePathStyle === 'string') {
+      const normalized = forcePathStyle.trim().toLowerCase();
+      s3Config.forcePathStyle = normalized === 'true' || normalized === '1';
     }
 
     this.s3 = new S3Client(s3Config);

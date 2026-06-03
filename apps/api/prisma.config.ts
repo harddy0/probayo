@@ -3,6 +3,51 @@
 import 'dotenv/config';
 import { defineConfig } from 'prisma/config';
 
+const rawDatabaseUrl = process.env['DATABASE_URL'];
+const rawDatabaseSsl = process.env['DATABASE_SSL'];
+
+const enforceTiDbSsl = (input?: string): string | undefined => {
+  if (!input) return input;
+
+  const trimmed = input.trim();
+  const unquoted =
+    trimmed.startsWith('"') && trimmed.endsWith('"')
+      ? trimmed.slice(1, -1)
+      : trimmed;
+
+  let url: URL;
+  try {
+    url = new URL(unquoted);
+  } catch {
+    return input;
+  }
+
+  const host = url.hostname.toLowerCase();
+  const isTiDb = host.includes('tidbcloud.com');
+  if (!isTiDb) return input;
+
+  const sslDisabled = rawDatabaseSsl === 'false' || rawDatabaseSsl === '0';
+  if (sslDisabled) return input;
+
+  const sslParam = url.searchParams.get('ssl');
+  if (sslParam !== null && (sslParam === 'false' || sslParam === '0')) {
+    url.searchParams.delete('ssl');
+  }
+
+  const sslAccept = url.searchParams.get('sslaccept');
+  if (sslAccept !== null && sslAccept.toLowerCase() === 'disabled') {
+    url.searchParams.delete('sslaccept');
+  }
+
+  const sslMode = url.searchParams.get('sslmode');
+  if (sslMode !== null && sslMode.toLowerCase() === 'disable') {
+    url.searchParams.delete('sslmode');
+  }
+
+  url.searchParams.set('sslaccept', 'strict');
+  return url.toString();
+};
+
 export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
@@ -10,6 +55,6 @@ export default defineConfig({
     seed: 'ts-node prisma/seed.ts',
   },
   datasource: {
-    url: process.env['DATABASE_URL'],
+    url: enforceTiDbSsl(rawDatabaseUrl),
   },
 });
