@@ -4,6 +4,7 @@ import {
   forwardRef,
   UnauthorizedException,
   BadRequestException,
+  InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -317,7 +318,14 @@ export class AuthService {
 
   private buildResetUrl(frontendBaseUrl: string | undefined, token: string) {
     const configBaseUrl = this.configService.get<string>('FRONTEND_BASE_URL');
-    const baseUrl = frontendBaseUrl || configBaseUrl || 'http://localhost:3000';
+    const baseUrl = frontendBaseUrl || configBaseUrl;
+
+    if (!baseUrl) {
+      throw new InternalServerErrorException(
+        'FRONTEND_BASE_URL is not configured. Set the FRONTEND_BASE_URL environment variable.',
+      );
+    }
+
     const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
     const encodedToken = encodeURIComponent(token);
 

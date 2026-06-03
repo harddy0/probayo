@@ -39,18 +39,19 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
       validationSchema: Joi.object({
         DATABASE_URL: Joi.string().required(),
         PORT: Joi.number().required(),
+        JWT_SECRET: Joi.string().required(),
         REDIS_URL: Joi.string().optional(),
         REDIS_HOST: Joi.string().optional(),
         REDIS_PORT: Joi.number().optional(),
         REDIS_USERNAME: Joi.string().optional(),
         REDIS_PASSWORD: Joi.string().optional(),
-        RESEND_API_KEY: Joi.string().required(),
-        EMAIL_FROM_ADDRESS: Joi.string().email().required(),
-        EMAIL_FROM_NAME: Joi.string().required(),
+        RESEND_API_KEY: Joi.string().optional(),
+        EMAIL_FROM_ADDRESS: Joi.string().optional(),
+        EMAIL_FROM_NAME: Joi.string().optional(),
         RESET_TOKEN_TTL_MINUTES: Joi.number().optional(),
         FRONTEND_BASE_URL: Joi.string().optional(),
         RESET_TOKEN_USED_RETENTION_DAYS: Joi.number().optional(),
-      }),
+      }).options({ allowUnknown: true }),
     }),
 
     BullModule.forRoot({
@@ -64,6 +65,16 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
           ? Number(process.env.REDIS_PORT)
           : 6379;
         const conn: any = { host, port };
+
+        // Add retry/fallback config so the app boots even without Redis
+        conn.retryStrategy = (times: number) => {
+          const delay = Math.min(times * 200, 3000);
+          return delay;
+        };
+        conn.maxRetriesPerRequest = null;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        conn.enableOfflineQueue = true;
+
         if (process.env.REDIS_USERNAME)
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           conn.username = process.env.REDIS_USERNAME;
