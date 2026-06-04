@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
   UseGuards,
   Request,
   ForbiddenException,
@@ -14,6 +15,7 @@ import {
   ApiBody,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
   ApiBearerAuth,
@@ -21,7 +23,9 @@ import {
 import { UserRole } from '@prisma/client';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { FindUsersQueryDto } from './dto/find-users-query.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UserResponseDto } from './dto/user-response.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ActiveUserGuard } from '../auth/guards/active-user.guard';
@@ -46,12 +50,29 @@ export class UsersController {
 
   @Get()
   @UseGuards(JwtAuthGuard, ActiveUserGuard, RolesGuard)
-  @Roles(UserRole.Admin)
+  @Roles(UserRole.Admin, UserRole.ItStaff)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'List all users' })
-  @ApiResponse({ status: 200, description: 'Returns all users.' })
-  findAll() {
-    return this.usersService.findAll();
+  @ApiOperation({
+    summary: 'List all users',
+    description:
+      'Returns a list of users with fields safe for frontend display. ' +
+      'Supports ?search=term to filter by name or email for AJAX dropdowns. ' +
+      'Accessible by Admin and IT Staff roles.',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search term to filter users by first name, last name, or email',
+    example: 'john',
+    type: 'string',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of users (passwordHash excluded)',
+    type: [UserResponseDto],
+  })
+  findAll(@Query() query: FindUsersQueryDto) {
+    return this.usersService.findAll(query.search);
   }
 
   @Get(':id')
@@ -62,9 +83,14 @@ export class UsersController {
   @ApiParam({
     name: 'id',
     description: 'UUID of the user to retrieve',
+    example: '123e4567-e89b-12d3-a456-426614174000',
     type: 'string',
   })
-  @ApiResponse({ status: 200, description: 'Returns the requested user.' })
+  @ApiResponse({
+    status: 200,
+    description: 'The requested user (passwordHash excluded)',
+    type: UserResponseDto,
+  })
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
   }

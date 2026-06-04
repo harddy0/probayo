@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Resend } from 'resend';
+import { BrevoClient } from '@getbrevo/brevo';
 
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
 
-  private readonly resendClient: Resend | null;
+  private readonly brevoClient: BrevoClient | null;
 
   private readonly sender: {
     email: string;
@@ -14,51 +14,54 @@ export class MailService {
   };
 
   constructor(private readonly configService: ConfigService) {
-    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+    const apiKey = this.configService.get<string>('MAILER_API_KEY');
 
     if (!apiKey) {
-      this.logger.warn('RESEND_API_KEY is not set!');
-      this.resendClient = null;
+      this.logger.warn('MAILER_API_KEY is not set!');
+      this.brevoClient = null;
     } else {
-      this.resendClient = new Resend(apiKey);
+      this.brevoClient = new BrevoClient({ apiKey });
     }
 
     this.sender = {
       email:
         this.configService.get<string>('EMAIL_FROM_ADDRESS') ??
-        'onboarding@resend.dev',
+        'it-support@yourcompany.com',
 
       name: this.configService.get<string>('EMAIL_FROM_NAME') ?? 'IT Helpdesk',
     };
   }
 
-  async sendEmail(to: string, subject: string, htmlContent: string) {
-    if (!this.resendClient) {
-      throw new Error('Cannot send email: RESEND_API_KEY is not configured.');
+  async sendEmail(
+    to: string,
+    subject: string,
+    htmlContent: string,
+  ): Promise<{ messageId: string | undefined }> {
+    if (!this.brevoClient) {
+      throw new Error('Cannot send email: MAILER_API_KEY is not configured.');
     }
 
-    const from = `${this.sender.name} <${this.sender.email}>`;
-
-    const { data, error } = await this.resendClient.emails.send({
-      from,
-      to: [to],
-      subject,
-      html: htmlContent,
-    });
-
-    if (error) {
-      this.logger.error(
-        `Resend error sending email to ${to}: ${error.message}`,
-        error,
+    try {
+      const result = await this.brevoClient.transactionalEmails.sendTransacEmail(
+        {
+          subject,
+          htmlContent,
+          sender: { name: this.sender.name, email: this.sender.email },
+          to: [{ email: to }],
+        },
       );
-      throw new Error(error.message);
+
+      this.logger.log(
+        `Email accepted by Brevo (messageId: ${result.messageId}) for ${to}`,
+      );
+
+      return { messageId: result.messageId };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Brevo error sending email to ${to}: ${message}`, error);
+      throw error;
     }
-
-    this.logger.log(
-      `Email accepted by Resend (id: ${data?.id ?? 'unknown'}) for ${to}`,
-    );
-
-    return data;
   }
 
   async sendPasswordResetEmail(input: {
@@ -67,7 +70,7 @@ export class MailService {
     lastName: string | null;
     resetUrl: string;
     expiresAt: Date;
-  }) {
+  }): Promise<{ messageId: string | undefined }> {
     const displayName = [input.firstName, input.lastName]
       .filter(Boolean)
       .join(' ');
