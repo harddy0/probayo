@@ -1,5 +1,5 @@
 # ============================================================
-# Dockerfile — Probayo NestJS API
+# Dockerfile — Probayo NestJS API (npm workspaces monorepo)
 # ============================================================
 # Multi-stage build for smallest possible image:
 #   - builder: installs all deps, generates Prisma client, compiles build
@@ -8,55 +8,67 @@
 #   - Non-root user for runtime security
 #   - Prisma migrations on startup (external DB, not embedded)
 # ============================================================
+# Build from the MONOREPO ROOT:
+#   docker build -f apps/api/Dockerfile -t harddy0/probayo:1.0.0 .
+# ============================================================
 
 # ─────────────────────────────────────────────────────────────
 # Stage 1: Install dependencies & build
 # ─────────────────────────────────────────────────────────────
 FROM node:24-alpine AS builder
-WORKDIR /app
 
 # ── Layer 1: System deps for TLS/SSL (TiDB Cloud needs root CAs) ──
 RUN apk add --no-cache ca-certificates && update-ca-certificates
 
-# ── Layer 2: Dependency manifests (cached until package.json/prisma changes) ──
-COPY package*.json ./
-COPY prisma/ ./prisma/
+WORKDIR /app
 
-# Install ALL dependencies (dev + prod) — uses lockfile for reproducibility
+# ── Layer 2: Workspace manifests + root lockfile ──
+# Copy root workspace config and the single source-of-truth lock file
+COPY package.json package-lock.json ./
+# Copy the API's package.json so npm can resolve the workspace member
+COPY apps/api/package.json ./apps/api/
+# Copy Prisma schema (needed before npm ci for postinstall hooks)
+COPY apps/api/prisma/ ./apps/api/prisma/
+
+# Install ALL dependencies using the root lockfile for reproducibility
 RUN npm ci
 
-# ── Layer 3: Source code ──
-COPY tsconfig*.json nest-cli.json prisma.config.ts ./
-COPY src/ ./src/
+# ── Layer 3: API source code ──
+COPY apps/api/tsconfig*.json apps/api/nest-cli.json apps/api/prisma.config.ts ./apps/api/
+COPY apps/api/src/ ./apps/api/src/
 
 # ── Layer 4: Generate Prisma client & compile NestJS ──
+WORKDIR /app/apps/api
 RUN npx prisma generate && npm run build
 
-# ── Layer 5: Strip devDeps (prisma CLI is in dependencies, so it's kept) ──
+# ── Layer 5: Strip devDeps (prune at workspace root, keeps hoisted deps) ──
+WORKDIR /app
 RUN npm prune --omit=dev && npm cache clean --force
 
 # ─────────────────────────────────────────────────────────────
 # Stage 2: Production runtime — absolute minimum
 # ─────────────────────────────────────────────────────────────
 FROM node:24-alpine AS runner
-WORKDIR /app
 
 # ── Layer 1: Runtime system deps ──
 # openssl needed by Prisma engine; ca-certificates for TLS to TiDB Cloud
 RUN apk add --no-cache openssl ca-certificates && update-ca-certificates
 
+WORKDIR /app/apps/api
+
 # ── Layer 2: Production artifacts ──
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/prisma.config.ts ./
+# node_modules is hoisted to /app/node_modules by npm workspaces
+COPY --from=builder /app/node_modules /app/node_modules
+COPY --from=builder /app/apps/api/dist ./dist
+COPY --from=builder /app/apps/api/prisma ./prisma
+COPY --from=builder /app/apps/api/package.json ./
+COPY --from=builder /app/apps/api/prisma.config.ts ./
 
 # ── Layer 3: Strip ~50MB of non-Alpine Prisma engines + cache ──
-RUN rm -rf node_modules/.cache && \
-    find node_modules/.prisma/client -name "*.so*" -not -name "*alpine*" -delete 2>/dev/null || true && \
-    find node_modules/.prisma/client -name "*.node" -not -name "*alpine*" -delete 2>/dev/null || true && \
-    rm -f node_modules/.prisma/client/*.wasm 2>/dev/null || true
+RUN rm -rf /app/node_modules/.cache && \
+    find /app/node_modules/.prisma/client -name "*.so*" -not -name "*alpine*" -delete 2>/dev/null || true && \
+    find /app/node_modules/.prisma/client -name "*.node" -not -name "*alpine*" -delete 2>/dev/null || true && \
+    rm -f /app/node_modules/.prisma/client/*.wasm 2>/dev/null || true
 
 # ── Layer 4: OCI metadata labels ──
 LABEL org.opencontainers.image.title="Probayo API" \
@@ -67,7 +79,7 @@ LABEL org.opencontainers.image.title="Probayo API" \
 # ── Layer 5: Non-root user + uploads directory ──
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup -h /home/appuser && \
     mkdir -p /app/uploads && \
-    chown -R appuser:appgroup /app/uploads /app/prisma
+    chown -R appuser:appgroup /app/uploads /app/apps/api/prisma
 
 ENV NODE_ENV=production HOME=/home/appuser PRISMA_CONFIG=./prisma.config.ts
 USER appuser
