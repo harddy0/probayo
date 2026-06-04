@@ -25,10 +25,9 @@ COPY prisma/ ./prisma/
 # Install ALL dependencies (dev + prod) — uses lockfile for reproducibility
 RUN npm ci
 
-# ── Layer 3: Source code + TLS cert (only what NestJS needs) ──
+# ── Layer 3: Source code ──
 COPY tsconfig*.json nest-cli.json prisma.config.ts ./
 COPY src/ ./src/
-COPY isrgrootx1.pem ./
 
 # ── Layer 4: Generate Prisma client & compile NestJS ──
 RUN npx prisma generate && npm run build
@@ -52,7 +51,6 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/prisma.config.ts ./
-COPY --from=builder /app/isrgrootx1.pem ./
 
 # ── Layer 3: Strip ~50MB of non-Alpine Prisma engines + cache ──
 RUN rm -rf node_modules/.cache && \
