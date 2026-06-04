@@ -114,13 +114,25 @@ export class FilesProcessor extends WorkerHost {
         filePath: filePath,
       };
     } catch (error) {
-      this.logger.error(`[Job ${job.id}] Failed:`, error);
+      // Normalize the error for safe logging and recording
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error(
+        `[Job ${job.id}] Failed processing ${file.originalname} (ticket: ${ticketId}): ${errorMessage}`,
+        errorStack,
+      );
 
       const maxRetries = job.opts.attempts || 3;
       if (job.attemptsMade >= maxRetries) {
-        await this.failedJobsService.recordFailedJob(job, error as Error);
+        await this.failedJobsService.recordFailedJob(
+          job,
+          error instanceof Error ? error : new Error(errorMessage),
+        );
       }
 
+      // Re-throw so BullMQ handles retries
       throw error;
     }
   }

@@ -1,9 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { File as MulterFile } from 'multer';
-import { createReadStream } from 'fs';
+import { createReadStream, existsSync } from 'fs';
 import { Readable } from 'stream';
 
 @Injectable()
@@ -42,7 +42,15 @@ export class LocalStorageService {
   }
 
   async get(filePath: string): Promise<Buffer> {
-    return fs.readFile(filePath);
+    try {
+      return await fs.readFile(filePath);
+    } catch (error) {
+      const nodeErr = error as NodeJS.ErrnoException;
+      if (nodeErr.code === 'ENOENT') {
+        throw new NotFoundException(`File not found at path: ${filePath}`);
+      }
+      throw error;
+    }
   }
 
   async delete(filePath: string): Promise<void> {
@@ -50,6 +58,11 @@ export class LocalStorageService {
       await fs.unlink(filePath);
       this.logger.log(`File deleted: ${filePath}`);
     } catch (error) {
+      const nodeErr = error as NodeJS.ErrnoException;
+      if (nodeErr.code === 'ENOENT') {
+        this.logger.warn(`File already deleted or not found: ${filePath}`);
+        return;
+      }
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to delete file: ${filePath}`, message);
       throw error;
@@ -59,17 +72,37 @@ export class LocalStorageService {
   async getFileInfo(
     filePath: string,
   ): Promise<{ size: number; modified: Date }> {
-    const stats = await fs.stat(filePath);
-    return {
-      size: stats.size,
-      modified: stats.mtime,
-    };
+    try {
+      const stats = await fs.stat(filePath);
+      return {
+        size: stats.size,
+        modified: stats.mtime,
+      };
+    } catch (error) {
+      const nodeErr = error as NodeJS.ErrnoException;
+      if (nodeErr.code === 'ENOENT') {
+        throw new NotFoundException(`File not found at path: ${filePath}`);
+      }
+      throw error;
+    }
   }
-  getStream(filePath: string): Promise<Readable> {
-    return Promise.resolve(createReadStream(filePath));
+  async getStream(filePath: string): Promise<Readable> {
+    if (!existsSync(filePath)) {
+      throw new NotFoundException(`File not found at path: ${filePath}`);
+    }
+    const stream = createReadStream(filePath);
+    return stream;
   }
   async getFileSize(filePath: string): Promise<number> {
-    const stats = await fs.stat(filePath);
-    return stats.size;
+    try {
+      const stats = await fs.stat(filePath);
+      return stats.size;
+    } catch (error) {
+      const nodeErr = error as NodeJS.ErrnoException;
+      if (nodeErr.code === 'ENOENT') {
+        throw new NotFoundException(`File not found at path: ${filePath}`);
+      }
+      throw error;
+    }
   }
 }
