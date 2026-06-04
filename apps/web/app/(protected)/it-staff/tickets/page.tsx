@@ -241,6 +241,7 @@ const pollAttachmentJob = async (jobId: string) => {
 
 const views: { id: ItStaffTicketView; label: string; icon: React.ReactNode }[] =
   [
+    { id: "all", label: "All tickets", icon: <Circle className="h-4 w-4" /> },
     {
       id: "unassigned",
       label: "Unassigned",
@@ -251,7 +252,6 @@ const views: { id: ItStaffTicketView; label: string; icon: React.ReactNode }[] =
       label: "My tickets",
       icon: <UserCheck className="h-4 w-4" />,
     },
-    { id: "all", label: "All tickets", icon: <Circle className="h-4 w-4" /> },
   ];
 
 // ── SLA Timer ──
@@ -345,10 +345,11 @@ function AttachmentImage({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attachment.id]);
+  const imageHeight = "h-40";
 
   if (loading) {
     return (
-      <div className="flex h-32 w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]">
+      <div className={`flex ${imageHeight} w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]`}>
         <Loader className="h-5 w-5 animate-spin text-zinc-400" />
       </div>
     );
@@ -371,7 +372,7 @@ function AttachmentImage({
         <img
           src={url}
           alt={attachment.fileName}
-          className="aspect-[4/3] w-full object-cover transition duration-200 group-hover:scale-105"
+          className={`${imageHeight} w-full object-cover transition duration-200 group-hover:scale-105`}
         />
         <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition duration-200 group-hover:bg-black/40">
           <span className="scale-0 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm transition duration-200 group-hover:scale-100">
@@ -408,7 +409,7 @@ export default function ItStaffTicketsPage() {
   const [detailError, setDetailError] = useState<string | null>(null);
 
   // ── UI State ──
-  const [activeView, setActiveView] = useState<ItStaffTicketView>("unassigned");
+  const [activeView, setActiveView] = useState<ItStaffTicketView>("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("details");
   const [searchQuery, setSearchQuery] = useState("");
@@ -560,6 +561,18 @@ export default function ItStaffTicketsPage() {
   const filteredTickets = useMemo(() => {
     let result = tickets;
 
+    // Client-side view filter (safety net for any backend issues)
+    if (activeView === "unassigned") {
+      result = result.filter(
+        (t) => !t.assignedToUserId && !t.assignedTo?.id,
+      );
+    } else if (activeView === "my-tickets" && currentUserId) {
+      result = result.filter(
+        (t) =>
+          (t.assignedToUserId ?? t.assignedTo?.id) === currentUserId,
+      );
+    }
+
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter((t) => t.title.toLowerCase().includes(q));
@@ -586,7 +599,7 @@ export default function ItStaffTicketsPage() {
     });
 
     return result;
-  }, [tickets, searchQuery, filterStatus, filterPriority]);
+  }, [tickets, searchQuery, filterStatus, filterPriority, activeView, currentUserId]);
 
   // ── Load Functions ──
   const loadTickets = useCallback(

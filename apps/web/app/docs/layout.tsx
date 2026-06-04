@@ -55,9 +55,9 @@ export default function DocsLayout({
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/10 bg-zinc-950/80 px-4 py-3 backdrop-blur-xl lg:hidden">
         <Link href="/docs" className="flex items-center gap-2 transition active:scale-95">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/10 text-[10px] font-bold text-white">
-            D
+            P
           </div>
-          <span className="text-sm font-medium text-zinc-300">Docs</span>
+          <span className="text-sm font-medium text-zinc-300">Probayo</span>
         </Link>
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
@@ -88,7 +88,7 @@ export default function DocsLayout({
           {/* Brand */}
           <div className="flex shrink-0 items-center gap-3 border-b border-white/10 px-6 py-5">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-sm font-bold text-white transition hover:bg-white/20">
-              D
+              P
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-300">

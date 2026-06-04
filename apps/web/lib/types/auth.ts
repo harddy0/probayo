@@ -42,6 +42,8 @@ export type ChangePasswordPayload = {
 
 export type PasswordResetRequestPayload = {
   email: string;
+  /** The base URL of the frontend origin, used by the backend to generate the password reset link sent via email. Captured client-side via window.location.origin. */
+  baseUrl?: string;
 };
 
 export type PasswordResetConfirmPayload = {

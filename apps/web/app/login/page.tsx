@@ -59,7 +59,6 @@ export default function LoginPage() {
     try {
       const summary = await login(email, password);
 
-      // Clear sensitive form data immediately
       if (formRef.current) {
         formRef.current.reset();
       }
@@ -67,7 +66,6 @@ export default function LoginPage() {
       router.push(getRoleRedirect(summary.identity.role));
     } catch {
       setError("Login failed. Check your credentials.");
-      // Clear password field on error for security
       if (formRef.current) {
         const passwordInput = formRef.current.querySelector('input[name="password"]') as HTMLInputElement;
         if (passwordInput) passwordInput.value = "";
@@ -97,7 +95,8 @@ export default function LoginPage() {
       <Card className="relative w-full max-w-5xl overflow-hidden border border-white/10 bg-white/5 shadow-[0_40px_150px_rgba(0,0,0,0.6)] backdrop-blur">
         <div className="grid md:grid-cols-[1.1fr_0.9fr]">
           {/* ── Left brand panel ── */}
-          <div className="hidden flex-col justify-between border-r border-white/10 p-8 md:flex lg:p-10">
+          <div className="relative hidden flex-col justify-between border-r border-white/10 bg-gradient-to-br from-white/[0.03] to-transparent p-8 md:flex lg:p-10">
+            {/* Brand */}
             <div>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-base font-bold tracking-tight text-white">
@@ -110,6 +109,7 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* Hero text */}
             <div className="max-w-sm">
               <h2 className="text-3xl font-semibold leading-tight tracking-tight text-white">
                 Welcome back to
@@ -117,38 +117,71 @@ export default function LoginPage() {
                 your workspace.
               </h2>
               <p className="mt-4 text-sm leading-relaxed text-zinc-400">
-              {`Sign in to manage tickets, track SLAs, and collaborate with your team across the organization.`}
+                Sign in to manage tickets, track SLAs, and collaborate with your team.
               </p>
 
-              <div className="mt-8 space-y-3">
-                {[
-                  { label: "Smart ticket routing", description: "Auto-assign based on skills and availability" },
-                  { label: "Real-time SLA tracking", description: "Monitor response and resolution deadlines" },
-                  { label: "Unified team workspace", description: "Collaborate across IT, admin, and departments" },
-                ].map((feature) => (
-                  <div key={feature.label} className="flex items-start gap-3">
-                    <div className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-emerald-500/20 bg-emerald-500/10">
-                      <svg
-                        className="h-3 w-3 text-emerald-400"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2.5}
-                      >
+              {/* Role badge showcase */}
+              <div className="mt-8 flex flex-wrap gap-2">
+                <div className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-1.5">
+                  <div className="h-2 w-2 rounded-full bg-rose-400" />
+                  <span className="text-[11px] font-medium text-rose-200">Admin</span>
+                </div>
+                <div className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-1.5">
+                  <div className="h-2 w-2 rounded-full bg-sky-400" />
+                  <span className="text-[11px] font-medium text-sky-200">IT Staff</span>
+                </div>
+                <div className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5">
+                  <div className="h-2 w-2 rounded-full bg-emerald-400" />
+                  <span className="text-[11px] font-medium text-emerald-200">Employee</span>
+                </div>
+              </div>
+
+              {/* Feature list - grounded */}
+              <div className="mt-8 space-y-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-500">
+                  Key capabilities
+                </p>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-emerald-500/20 bg-emerald-500/10">
+                      <svg className="h-3 w-3 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-zinc-200">{feature.label}</p>
-                      <p className="text-xs text-zinc-500">{feature.description}</p>
+                      <p className="text-sm font-medium text-zinc-200">Ticket lifecycle</p>
+                      <p className="text-xs text-zinc-500">Track submissions through status pipeline</p>
                     </div>
                   </div>
-                ))}
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-emerald-500/20 bg-emerald-500/10">
+                      <svg className="h-3 w-3 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-zinc-200">SLA monitoring</p>
+                      <p className="text-xs text-zinc-500">Per-priority deadlines and escalation rules</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-emerald-500/20 bg-emerald-500/10">
+                      <svg className="h-3 w-3 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-zinc-200">Role-based access</p>
+                      <p className="text-xs text-zinc-500">Separate dashboards for Admin, IT Staff, and Employees</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
+            {/* Footer */}
             <div className="text-xs text-zinc-600">
-              Enterprise-grade IT management
+              Full-stack IT ticketing platform
             </div>
           </div>
 
@@ -228,24 +261,9 @@ export default function LoginPage() {
                 >
                   {isSubmitting ? (
                     <>
-                      <svg
-                        className="h-4 w-4 animate-spin"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                        />
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
                       Signing in...
                     </>
@@ -260,19 +278,14 @@ export default function LoginPage() {
             </CardContent>
 
             <CardFooter className="flex-col items-start gap-3 px-0 pb-0 pt-4">
-              <div className="flex items-center gap-2 text-xs text-zinc-600">
-                <div className="h-px flex-1 bg-white/10" />
-                <span>Secure enterprise login</span>
-                <div className="h-px flex-1 bg-white/10" />
-              </div>
               <p className="text-xs text-zinc-600">
                 Need help?{" "}
-                <button
-                  type="button"
+                <Link
+                  href="/forgot-password"
                   className="text-zinc-400 underline underline-offset-2 transition hover:text-zinc-200"
                 >
-                  Contact support
-                </button>
+                  Reset your password
+                </Link>
               </p>
             </CardFooter>
           </div>

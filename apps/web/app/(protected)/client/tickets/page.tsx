@@ -224,9 +224,11 @@ function AttachmentImage({ attachment, onView }: { attachment: TicketAttachment;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attachment.id]);
 
+  const imageHeight = "h-40";
+
   if (loading) {
     return (
-      <div className="flex aspect-[4/3] w-full items-center justify-center rounded-lg border border-white/10 bg-white/[0.03]">
+      <div className={`flex ${imageHeight} w-full items-center justify-center rounded-lg border border-white/10 bg-white/[0.03]`}>
         <Loader className="h-5 w-5 animate-spin text-zinc-400" />
       </div>
     );
@@ -234,7 +236,7 @@ function AttachmentImage({ attachment, onView }: { attachment: TicketAttachment;
 
   if (error) {
     return (
-      <div className="flex aspect-[4/3] w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.03]">
+      <div className={`flex ${imageHeight} w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.03]`}>
         <AlertCircle className="h-4 w-4 text-rose-400" />
         <span className="text-xs text-zinc-500">Failed to load</span>
       </div>
@@ -251,7 +253,7 @@ function AttachmentImage({ attachment, onView }: { attachment: TicketAttachment;
         <img
           src={url}
           alt={attachment.fileName}
-          className="aspect-[4/3] w-full object-cover transition duration-200 group-hover:scale-105"
+          className={`${imageHeight} w-full object-cover transition duration-200 group-hover:scale-105`}
         />
         <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition duration-200 group-hover:bg-black/40">
           <span className="scale-0 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm transition duration-200 group-hover:scale-100">
