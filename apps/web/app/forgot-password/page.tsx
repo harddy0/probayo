@@ -32,7 +32,10 @@ export default function ForgotPasswordPage() {
       return;
     }      setIsSubmitting(true);
     try {
-      await requestPasswordReset({ email: trimmedEmail });
+      await requestPasswordReset({
+        email: trimmedEmail,
+        baseUrl: window.location.origin,
+      });
       setIsSent(true);
     } catch (err) {
       const message =

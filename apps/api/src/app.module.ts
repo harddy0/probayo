@@ -45,7 +45,7 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
         REDIS_PORT: Joi.number().optional(),
         REDIS_USERNAME: Joi.string().optional(),
         REDIS_PASSWORD: Joi.string().optional(),
-        RESEND_API_KEY: Joi.string().optional(),
+        MAILER_API_KEY: Joi.string().optional(),
         EMAIL_FROM_ADDRESS: Joi.string().optional(),
         EMAIL_FROM_NAME: Joi.string().optional(),
         RESET_TOKEN_TTL_MINUTES: Joi.number().optional(),

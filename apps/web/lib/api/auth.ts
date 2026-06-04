@@ -107,9 +107,15 @@ export const changePassword = async (
 export const requestPasswordReset = async (
   payload: PasswordResetRequestPayload,
 ): Promise<void> => {
+  // Capture the frontend origin on the client so the backend can
+  // build a correct password-reset link that points back here.
+  const baseUrl =
+    payload.baseUrl ??
+    (typeof window !== "undefined" ? window.location.origin : undefined);
+
   await request("/auth/password-reset/request", {
     method: "POST",
-    body: payload,
+    body: { email: payload.email, ...(baseUrl ? { baseUrl } : {}) },
   });
 };
 

@@ -16,6 +16,9 @@ export const metadata: Metadata = {
   title: "Probayo — IT Support Platform",
   description:
     "A full-stack IT ticketing and asset management platform with role-based dashboards, SLA tracking, and escalation rules.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

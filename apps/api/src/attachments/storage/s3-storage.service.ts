@@ -1,5 +1,5 @@
 // src/attachments/storage/s3-storage.service.ts (NEW)
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   S3Client,
@@ -48,19 +48,26 @@ export class S3StorageService implements IStorageService {
     this.bucket = this.configService.get<string>('AWS_S3_BUCKET') ?? '';
   }
   async getStream(key: string): Promise<Readable> {
-    const response = await this.s3.send(
-      new GetObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-      }),
-    );
+    try {
+      const response = await this.s3.send(
+        new GetObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+        }),
+      );
 
-    if (!response.Body) {
-      throw new Error('Empty response body from S3');
+      if (!response.Body) {
+        throw new NotFoundException(`Empty response body from S3 for key: ${key}`);
+      }
+
+      // S3 returns ReadableStream that we can pipe directly
+      return response.Body as unknown as Readable;
+    } catch (error) {
+      if ((error as any).name === 'NoSuchKey') {
+        throw new NotFoundException(`File not found in S3: ${key}`);
+      }
+      throw error;
     }
-
-    // S3 returns ReadableStream that we can pipe directly
-    return response.Body as unknown as Readable;
   }
 
   async save(file: MulterFile, ticketId: string): Promise<string> {
@@ -81,33 +88,39 @@ export class S3StorageService implements IStorageService {
   }
 
   async get(key: string): Promise<Buffer> {
-    const response = await this.s3.send(
-      new GetObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-      }),
-    );
-    // Guard against empty body
+    try {
+      const response = await this.s3.send(
+        new GetObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+        }),
+      );
 
-    if (!response.Body) {
-      throw new Error('Empty response body from S3');
-    }
+      if (!response.Body) {
+        throw new NotFoundException(`Empty response body from S3 for key: ${key}`);
+      }
 
-    // If SDK provides transformToByteArray (browser/node unified API), use it
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (typeof (response.Body as any).transformToByteArray === 'function') {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-      return Buffer.from(await (response.Body as any).transformToByteArray());
-    }
+      // If SDK provides transformToByteArray (browser/node unified API), use it
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      if (typeof (response.Body as any).transformToByteArray === 'function') {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        return Buffer.from(await (response.Body as any).transformToByteArray());
+      }
 
-    // Otherwise, assume a NodeJS Readable stream and accumulate
-    const stream = response.Body as unknown as NodeJS.ReadableStream;
-    const chunks: Buffer[] = [];
-    for await (const chunk of stream as any) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      // Otherwise, assume a NodeJS Readable stream and accumulate
+      const stream = response.Body as unknown as NodeJS.ReadableStream;
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream as any) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      return Buffer.concat(chunks);
+    } catch (error) {
+      if ((error as any).name === 'NoSuchKey') {
+        throw new NotFoundException(`File not found in S3: ${key}`);
+      }
+      throw error;
     }
-    return Buffer.concat(chunks);
   }
 
   async delete(key: string): Promise<void> {

@@ -321,6 +321,7 @@ export class AttachmentsController {
   @ApiOperation({ summary: 'Download an attachment (streaming)' })
   @ApiParam({ name: 'id', description: 'Attachment UUID' })
   @ApiResponse({ status: 200, description: 'Returns the file stream' })
+  @ApiResponse({ status: 404, description: 'File not found' })
   async download(
     @Param('id') id: string,
     @Request() req: { user: { id: string } },
@@ -328,6 +329,21 @@ export class AttachmentsController {
   ) {
     const { stream, fileName, fileType, fileSize } =
       await this.attachmentsService.getDownloadStream(id, req.user.id);
+
+    // Handle stream errors to prevent crashes if file is removed mid-stream
+    stream.on('error', (error) => {
+      if (!res.headersSent) {
+        res.status(500).json({
+          message: 'Failed to stream file',
+          error: 'StreamError',
+        });
+      }
+    });
+
+    // Handle client disconnect gracefully
+    res.on('close', () => {
+      stream.destroy();
+    });
 
     res.setHeader('Content-Type', fileType);
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);

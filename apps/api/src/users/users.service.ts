@@ -33,8 +33,32 @@ export class UsersService {
     return await this.prisma.user.create({ data });
   }
 
-  async findAll() {
-    return await this.prisma.user.findMany();
+  async findAll(search?: string) {
+    const where: any = {};
+
+    if (search && search.trim()) {
+      const term = search.trim();
+      where.OR = [
+        { firstName: { contains: term } },
+        { lastName: { contains: term } },
+        { email: { contains: term } },
+      ];
+    }
+
+    return await this.prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        departmentId: true,
+        isActive: true,
+        createdAt: true,
+      },
+      orderBy: { firstName: 'asc' },
+    });
   }
 
   async findByEmail(email: string) {
